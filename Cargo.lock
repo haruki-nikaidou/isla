@@ -1255,6 +1255,19 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 [[package]]
 name = "plugin_registrar"
 version = "0.1.0"
+dependencies = [
+ "kanau",
+ "rand 0.9.4",
+ "redis",
+ "rkyv 0.8.16",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tracing",
+ "uuid",
+ "wakuwaku",
+]
 
 [[package]]
 name = "potential_utf"

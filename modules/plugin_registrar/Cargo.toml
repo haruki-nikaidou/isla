@@ -4,3 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+uuid.workspace = true
+sqlx.workspace = true
+time.workspace = true
+rand.workspace = true
+wakuwaku.workspace = true
+kanau.workspace = true
+rkyv.workspace = true
+redis.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
