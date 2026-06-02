@@ -24,8 +24,8 @@ pub struct PluginEntity {
     pub description: String,
     /// Shared secret used to sign JWTs the plugin presents to the cluster.
     pub jwt_secret: String,
-    /// Public key (or raw key material) used by the cluster to verify
-    /// signed messages sent by this plugin's server.
+    /// Public key (or raw key material) used by plugin to verify
+    /// signed messages sent by the cluster.
     pub server_message_signature_key: Vec<u8>,
     /// AMQP exchange name the cluster uses to publish messages addressed to
     /// this plugin.
