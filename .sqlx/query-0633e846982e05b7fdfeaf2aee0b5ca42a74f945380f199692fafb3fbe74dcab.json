@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                target,\n                timestamp,\n                version,\n                response AS \"response: SecretReadResponse\",\n                wrong_password,\n                audience,\n                scope\n            FROM vault.secret_read_log\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "target",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "timestamp",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "response: SecretReadResponse",
+        "type_info": {
+          "Custom": {
+            "name": "vault.secret_read_response",
+            "kind": {
+              "Enum": [
+                "Success",
+                "WrongPassword",
+                "SecretNotFound",
+                "SignatureVerificationFailed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "wrong_password",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 6,
+        "name": "audience",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scope",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "0633e846982e05b7fdfeaf2aee0b5ca42a74f945380f199692fafb3fbe74dcab"
+}

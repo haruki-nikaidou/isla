@@ -6,6 +6,8 @@ use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::sqlx::DatabaseProcessor;
 
+use super::PrivacyControlFlag;
+
 /// A unified identity representing a real person across platforms.
 ///
 /// Multiple [`ContactEntity`](super::contact::ContactEntity) records from
@@ -30,6 +32,11 @@ pub struct ContactIdentityEntity {
 
     /// When the relationship status was last changed.
     pub relationship_updated_at: PrimitiveDateTime,
+
+    /// Audience visibility for everything we know about this identity (the
+    /// identity record itself; individual [`ContactStoryEntity`] rows carry
+    /// their own flag).
+    pub privacy: PrivacyControlFlag,
 }
 
 /// The type of relationship Isla has with a contact.
@@ -72,7 +79,8 @@ impl Processor<FindContactIdentityById> for DatabaseProcessor {
                 description,
                 relationship AS "relationship: Relationship",
                 first_meet_at,
-                relationship_updated_at
+                relationship_updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.contact_identity
             WHERE id = $1
             LIMIT 1
@@ -91,6 +99,7 @@ pub struct CreateContactIdentity {
     pub identify_name: String,
     pub description: String,
     pub relationship: Relationship,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateContactIdentity> for DatabaseProcessor {
@@ -101,14 +110,15 @@ impl Processor<CreateContactIdentity> for DatabaseProcessor {
     async fn process(&self, input: CreateContactIdentity) -> Result<Uuid, sqlx::Error> {
         sqlx::query_scalar!(
             r#"
-            INSERT INTO memory.contact_identity (id, identify_name, description, relationship)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO memory.contact_identity (id, identify_name, description, relationship, privacy)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             "#,
             input.id,
             input.identify_name,
             input.description,
             input.relationship as Relationship,
+            input.privacy as PrivacyControlFlag,
         )
         .fetch_one(self.db())
         .await
@@ -201,6 +211,35 @@ impl Processor<DeleteContactIdentity> for DatabaseProcessor {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of an identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateContactIdentityPrivacy {
+    pub id: Uuid,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateContactIdentityPrivacy> for DatabaseProcessor {
+    type Output = bool;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:UpdateContactIdentityPrivacy", err, fields(id = %input.id))]
+    async fn process(&self, input: UpdateContactIdentityPrivacy) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            UPDATE memory.contact_identity
+            SET privacy = $2
+            WHERE id = $1
+            "#,
+            input.id,
+            input.privacy as PrivacyControlFlag,
+        )
+        .execute(self.db())
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+}
+
 /// Paginated list of all identities ordered alphabetically by `identify_name`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListContactIdentities {
@@ -223,7 +262,8 @@ impl Processor<ListContactIdentities> for DatabaseProcessor {
                 description,
                 relationship AS "relationship: Relationship",
                 first_meet_at,
-                relationship_updated_at
+                relationship_updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.contact_identity
             ORDER BY identify_name ASC
             LIMIT $1 OFFSET $2

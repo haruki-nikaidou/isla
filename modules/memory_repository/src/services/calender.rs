@@ -14,19 +14,21 @@ use crate::entities::db::{
     calender_daily_event::{
         CalenderDailyEventEntity, CreateCalenderDailyEvent, DeleteCalenderDailyEvent,
         DailyEventRepeat, FindCalenderDailyEventById, ListCalenderDailyEventsInRange,
-        UpdateCalenderDailyEvent,
+        UpdateCalenderDailyEvent, UpdateCalenderDailyEventPrivacy,
     },
     calender_event::{
         CalenderEventEntity, CalenderEventRepeat, CreateCalenderEvent, DeleteCalenderEvent,
         FindCalenderEventById, ListCalenderEventsByCalendar, ListCalenderEventsInRange,
-        UpdateCalenderEvent,
+        UpdateCalenderEvent, UpdateCalenderEventPrivacy,
     },
     calender_task::{
         CalenderTaskDependencyEntity, CalenderTaskEntity, CalenderTaskStatus,
         CreateCalenderTask, CreateCalenderTaskDependency, DeleteCalenderTask,
         DeleteCalenderTaskDependency, FindCalenderTaskById, ListCalenderTaskDependenciesByBlocked,
-        ListCalenderTasksByCalendar, UpdateCalenderTask, UpdateCalenderTaskStatus,
+        ListCalenderTasksByCalendar, UpdateCalenderTask, UpdateCalenderTaskPrivacy,
+        UpdateCalenderTaskStatus,
     },
+    PrivacyControlFlag,
 };
 
 #[derive(Debug, Clone)]
@@ -168,6 +170,7 @@ pub struct CreateCalenderEventRequest {
     pub time: OffsetDateTime,
     pub repeat: CalenderEventRepeat,
     pub repeat_until: Option<Date>,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateCalenderEventRequest> for CalenderService {
@@ -189,6 +192,7 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
                 time: input.time,
                 repeat: input.repeat,
                 repeat_until: input.repeat_until,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -269,6 +273,29 @@ impl Processor<DeleteCalenderEventRequest> for CalenderService {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of a time-specific event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateCalenderEventPrivacyRequest {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateCalenderEventPrivacyRequest> for CalenderService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateCalenderEventPrivacyRequest", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateCalenderEventPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateCalenderEventPrivacy {
+                id: input.id,
+                privacy: input.privacy,
+            })
+            .await?)
+    }
+}
+
 /// All time-specific events in a calendar that fall within a time window.
 #[derive(Debug, Clone, Copy)]
 pub struct ListEventsInRangeRequest {
@@ -338,6 +365,7 @@ pub struct CreateDailyEventRequest {
     pub date: Date,
     pub repeat: DailyEventRepeat,
     pub repeat_until: Option<Date>,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateDailyEventRequest> for CalenderService {
@@ -359,6 +387,7 @@ impl Processor<CreateDailyEventRequest> for CalenderService {
                 date: input.date,
                 repeat: input.repeat,
                 repeat_until: input.repeat_until,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -439,6 +468,29 @@ impl Processor<DeleteDailyEventRequest> for CalenderService {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of an all-day event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateDailyEventPrivacyRequest {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateDailyEventPrivacyRequest> for CalenderService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateDailyEventPrivacyRequest", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateDailyEventPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateCalenderDailyEventPrivacy {
+                id: input.id,
+                privacy: input.privacy,
+            })
+            .await?)
+    }
+}
+
 /// All-day events in a calendar that fall within a date range (inclusive).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListDailyEventsInRangeRequest {
@@ -479,6 +531,7 @@ pub struct CreateTaskRequest {
     pub start_at: PrimitiveDateTime,
     pub deadline: PrimitiveDateTime,
     pub status: CalenderTaskStatus,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateTaskRequest> for CalenderService {
@@ -502,6 +555,7 @@ impl Processor<CreateTaskRequest> for CalenderService {
                 start_at: input.start_at,
                 deadline: input.deadline,
                 status: input.status,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -579,6 +633,29 @@ impl Processor<UpdateTaskStatusRequest> for CalenderService {
             .process(UpdateCalenderTaskStatus {
                 id: input.id,
                 status: input.status,
+            })
+            .await?)
+    }
+}
+
+/// Reassign the [`PrivacyControlFlag`] of a task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateTaskPrivacyRequest {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateTaskPrivacyRequest> for CalenderService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateTaskPrivacyRequest", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateTaskPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateCalenderTaskPrivacy {
+                id: input.id,
+                privacy: input.privacy,
             })
             .await?)
     }

@@ -5,9 +5,12 @@ use time::Date;
 use tracing::instrument;
 use wakuwaku::{sqlx::DatabaseProcessor, Error};
 
-use crate::entities::db::diary::{
-    CreateDiary, DeleteDiary, DiaryEntity, FindDiaryByDate, FindDiaryById, ListDiaries,
-    UpdateDiary,
+use crate::entities::db::{
+    diary::{
+        CreateDiary, DeleteDiary, DiaryEntity, FindDiaryByDate, FindDiaryById, ListDiaries,
+        UpdateDiary, UpdateDiaryPrivacy,
+    },
+    PrivacyControlFlag,
 };
 
 #[derive(Debug, Clone)]
@@ -22,6 +25,9 @@ pub struct CreateDiaryRequest {
     pub date: Date,
     pub summary: String,
     pub content: String,
+    /// Audience visibility; pass [`PrivacyControlFlag::default`] for the
+    /// `Protected` default if no explicit choice is needed.
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateDiaryRequest> for DiaryService {
@@ -40,6 +46,7 @@ impl Processor<CreateDiaryRequest> for DiaryService {
                 date: input.date,
                 summary: input.summary,
                 content: input.content,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -108,6 +115,29 @@ impl Processor<UpdateDiaryRequest> for DiaryService {
                 title: input.title,
                 summary: input.summary,
                 content: input.content,
+            })
+            .await?)
+    }
+}
+
+/// Reassign the [`PrivacyControlFlag`] of a diary entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateDiaryPrivacyRequest {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateDiaryPrivacyRequest> for DiaryService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateDiaryPrivacyRequest", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateDiaryPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateDiaryPrivacy {
+                id: input.id,
+                privacy: input.privacy,
             })
             .await?)
     }

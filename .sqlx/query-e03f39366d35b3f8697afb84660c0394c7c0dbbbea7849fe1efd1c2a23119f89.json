@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                platform,\n                name,\n                allowed_scopes,\n                content,\n                signature,\n                key,\n                created_at,\n                updated_at,\n                version\n            FROM vault.secret\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "platform",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "allowed_scopes",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "content",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "signature",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 6,
+        "name": "key",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "version",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e03f39366d35b3f8697afb84660c0394c7c0dbbbea7849fe1efd1c2a23119f89"
+}

@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO memory.conversation (opening_summary, created_at, updated_at, privacy)\n            VALUES ($1, $2, $3, $4)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8",
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "35661daedcd83045d9af2a11cbfac4da7e4e94f152c411be0227f96702ff19c1"
+}

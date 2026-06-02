@@ -21,3 +21,53 @@ pub mod conversation_content;
 pub mod conversation_message;
 pub mod diary;
 pub mod object_storage;
+
+/// Audience-based visibility flag for stored memory entities.
+///
+/// The flag is consulted by the service layer when it assembles LLM input
+/// context for a conversation: rows whose [`PrivacyControlFlag`] excludes
+/// the current peer's [`Relationship`](contact_identity::Relationship) must
+/// be omitted so private context never leaks across audiences.
+///
+/// Visibility matrix (✓ = visible):
+///
+/// | Flag        | Master | Dude | Acquaintance | Stranger / Ignored |
+/// | ----------- | :----: | :--: | :----------: | :----------------: |
+/// | `Private`   |   ✓    |      |              |                    |
+/// | `Protected` |   ✓    |  ✓   |      ✓       |                    |
+/// | `Public`    |   ✓    |  ✓   |      ✓       |         ✓          |
+///
+/// Stored in PostgreSQL as the `memory.privacy_control` enum. Newly created
+/// rows default to [`PrivacyControlFlag::Protected`] at the database level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
+#[sqlx(type_name = "memory.privacy_control")]
+pub enum PrivacyControlFlag {
+    /// Visible only to the Master.
+    Private,
+    /// Visible to the Master and to known relationships (Dude, Acquaintance).
+    Protected,
+    /// Visible to everyone, including strangers.
+    Public,
+}
+
+impl PrivacyControlFlag {
+    /// Returns `true` if a memory tagged with this flag may be surfaced to a
+    /// peer in the given [`Relationship`](contact_identity::Relationship).
+    #[must_use]
+    pub const fn allows(self, relationship: contact_identity::Relationship) -> bool {
+        use contact_identity::Relationship;
+        match (self, relationship) {
+            (_, Relationship::Master) => true,
+            (Self::Private, _) => false,
+            (Self::Protected, Relationship::Dude | Relationship::Acquaintance) => true,
+            (Self::Protected, _) => false,
+            (Self::Public, _) => true,
+        }
+    }
+}
+
+impl Default for PrivacyControlFlag {
+    fn default() -> Self {
+        Self::Protected
+    }
+}

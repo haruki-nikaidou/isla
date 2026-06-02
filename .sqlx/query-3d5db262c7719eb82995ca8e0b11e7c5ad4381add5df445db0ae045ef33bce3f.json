@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE memory.contact_identity\n            SET privacy = $2\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3d5db262c7719eb82995ca8e0b11e7c5ad4381add5df445db0ae045ef33bce3f"
+}

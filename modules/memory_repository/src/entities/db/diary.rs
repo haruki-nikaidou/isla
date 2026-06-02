@@ -5,6 +5,8 @@ use time::{Date, PrimitiveDateTime};
 use tracing::instrument;
 use wakuwaku::sqlx::DatabaseProcessor;
 
+use super::PrivacyControlFlag;
+
 /// A daily diary entry summarizing events and reflections.
 ///
 /// Diaries provide a high-level record of each day, helping Isla maintain
@@ -31,6 +33,10 @@ pub struct DiaryEntity {
 
     /// When this entry was last edited.
     pub updated_at: PrimitiveDateTime,
+
+    /// Audience visibility for this entry; gates whether the agent may
+    /// surface it as context to a given peer.
+    pub privacy: PrivacyControlFlag,
 }
 
 /// Find a [`DiaryEntity`] by its bigserial primary key.
@@ -48,7 +54,9 @@ impl Processor<FindDiaryById> for DatabaseProcessor {
         sqlx::query_as!(
             DiaryEntity,
             r#"
-            SELECT id, title, date, summary, content, created_at, updated_at
+            SELECT
+                id, title, date, summary, content, created_at, updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.diary
             WHERE id = $1
             LIMIT 1
@@ -75,7 +83,9 @@ impl Processor<FindDiaryByDate> for DatabaseProcessor {
         sqlx::query_as!(
             DiaryEntity,
             r#"
-            SELECT id, title, date, summary, content, created_at, updated_at
+            SELECT
+                id, title, date, summary, content, created_at, updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.diary
             WHERE date = $1
             LIMIT 1
@@ -94,6 +104,7 @@ pub struct CreateDiary {
     pub date: Date,
     pub summary: String,
     pub content: String,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateDiary> for DatabaseProcessor {
@@ -104,14 +115,15 @@ impl Processor<CreateDiary> for DatabaseProcessor {
     async fn process(&self, input: CreateDiary) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar!(
             r#"
-            INSERT INTO memory.diary (title, date, summary, content)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO memory.diary (title, date, summary, content, privacy)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             "#,
             input.title,
             input.date,
             input.summary,
             input.content,
+            input.privacy as PrivacyControlFlag,
         )
         .fetch_one(self.db())
         .await
@@ -175,6 +187,36 @@ impl Processor<DeleteDiary> for DatabaseProcessor {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of a diary entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateDiaryPrivacy {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateDiaryPrivacy> for DatabaseProcessor {
+    type Output = bool;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:UpdateDiaryPrivacy", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateDiaryPrivacy) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            UPDATE memory.diary
+            SET privacy = $2,
+                updated_at = (now() AT TIME ZONE 'utc')
+            WHERE id = $1
+            "#,
+            input.id,
+            input.privacy as PrivacyControlFlag,
+        )
+        .execute(self.db())
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+}
+
 /// Paginated list of diary entries ordered by date descending (most recent first).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListDiaries {
@@ -191,7 +233,9 @@ impl Processor<ListDiaries> for DatabaseProcessor {
         sqlx::query_as!(
             DiaryEntity,
             r#"
-            SELECT id, title, date, summary, content, created_at, updated_at
+            SELECT
+                id, title, date, summary, content, created_at, updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.diary
             ORDER BY date DESC
             LIMIT $1 OFFSET $2

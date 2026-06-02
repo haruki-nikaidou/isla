@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO memory.contact_identity (id, identify_name, description, relationship)\n            VALUES ($1, $2, $3, $4)\n            RETURNING id\n            ",
+  "query": "\n            INSERT INTO memory.contact_identity (id, identify_name, description, relationship, privacy)\n            VALUES ($1, $2, $3, $4, $5)\n            RETURNING id\n            ",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,18 @@
               ]
             }
           }
+        },
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
         }
       ]
     },
@@ -34,5 +46,5 @@
       false
     ]
   },
-  "hash": "dace08726a4e480ecaaa6d6a3e0c5f0fcbc596d2e94a3a898d4b8e9fb21c65c2"
+  "hash": "169299571c8a24489165cdd5e92afb6b66488c9b6b0bc5f5542e7c27ad9d60a4"
 }

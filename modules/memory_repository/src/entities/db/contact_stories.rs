@@ -6,6 +6,8 @@ use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::sqlx::DatabaseProcessor;
 
+use super::PrivacyControlFlag;
+
 /// A notable event or interaction involving a contact.
 ///
 /// Stories capture significant moments in Isla's relationship with a person,
@@ -35,6 +37,9 @@ pub struct ContactStoryEntity {
 
     /// Optional link to the conversation where this story originated.
     pub related_conversation: Option<i64>,
+
+    /// Audience visibility for this story.
+    pub privacy: PrivacyControlFlag,
 }
 
 /// Classification of what kind of event a story represents.
@@ -79,7 +84,8 @@ impl Processor<FindContactStoryById> for DatabaseProcessor {
                 story_summary,
                 story_text,
                 happened_at,
-                related_conversation
+                related_conversation,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.contact_story
             WHERE id = $1
             LIMIT 1
@@ -101,6 +107,7 @@ pub struct CreateContactStory {
     pub story_text: String,
     pub happened_at: PrimitiveDateTime,
     pub related_conversation: Option<i64>,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateContactStory> for DatabaseProcessor {
@@ -112,8 +119,9 @@ impl Processor<CreateContactStory> for DatabaseProcessor {
         sqlx::query_scalar!(
             r#"
             INSERT INTO memory.contact_story
-                (identity, story_type, story_name, story_summary, story_text, happened_at, related_conversation)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                (identity, story_type, story_name, story_summary, story_text,
+                 happened_at, related_conversation, privacy)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
             "#,
             input.identity,
@@ -123,6 +131,7 @@ impl Processor<CreateContactStory> for DatabaseProcessor {
             input.story_text,
             input.happened_at,
             input.related_conversation,
+            input.privacy as PrivacyControlFlag,
         )
         .fetch_one(self.db())
         .await
@@ -185,6 +194,35 @@ impl Processor<DeleteContactStory> for DatabaseProcessor {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of a story.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateContactStoryPrivacy {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateContactStoryPrivacy> for DatabaseProcessor {
+    type Output = bool;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:UpdateContactStoryPrivacy", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateContactStoryPrivacy) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            UPDATE memory.contact_story
+            SET privacy = $2
+            WHERE id = $1
+            "#,
+            input.id,
+            input.privacy as PrivacyControlFlag,
+        )
+        .execute(self.db())
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+}
+
 /// Paginated list of stories for an identity ordered by occurrence time (newest first).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListContactStoriesByIdentity {
@@ -213,7 +251,8 @@ impl Processor<ListContactStoriesByIdentity> for DatabaseProcessor {
                 story_summary,
                 story_text,
                 happened_at,
-                related_conversation
+                related_conversation,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.contact_story
             WHERE identity = $1
             ORDER BY happened_at DESC

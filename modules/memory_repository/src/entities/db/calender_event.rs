@@ -6,6 +6,8 @@ use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::sqlx::DatabaseProcessor;
 
+use super::PrivacyControlFlag;
+
 /// A calendar event with a specific start time.
 ///
 /// Used for meetings, appointments, reminders, and other events
@@ -38,6 +40,9 @@ pub struct CalenderEventEntity {
 
     /// When this event was last modified.
     pub updated_at: PrimitiveDateTime,
+
+    /// Audience visibility for this event.
+    pub privacy: PrivacyControlFlag,
 }
 
 /// Recurrence pattern for time-specific events.
@@ -81,7 +86,8 @@ impl Processor<FindCalenderEventById> for DatabaseProcessor {
                 repeat AS "repeat: CalenderEventRepeat",
                 repeat_until,
                 created_at,
-                updated_at
+                updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.calender_event
             WHERE id = $1
             LIMIT 1
@@ -102,6 +108,7 @@ pub struct CreateCalenderEvent {
     pub time: OffsetDateTime,
     pub repeat: CalenderEventRepeat,
     pub repeat_until: Option<Date>,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateCalenderEvent> for DatabaseProcessor {
@@ -113,8 +120,8 @@ impl Processor<CreateCalenderEvent> for DatabaseProcessor {
         sqlx::query_scalar!(
             r#"
             INSERT INTO memory.calender_event
-                (calendar_id, title, description, time, repeat, repeat_until)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (calendar_id, title, description, time, repeat, repeat_until, privacy)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
             "#,
             input.calendar_id,
@@ -123,6 +130,7 @@ impl Processor<CreateCalenderEvent> for DatabaseProcessor {
             input.time,
             input.repeat as CalenderEventRepeat,
             input.repeat_until,
+            input.privacy as PrivacyControlFlag,
         )
         .fetch_one(self.db())
         .await
@@ -190,6 +198,36 @@ impl Processor<DeleteCalenderEvent> for DatabaseProcessor {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of a time-specific event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateCalenderEventPrivacy {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateCalenderEventPrivacy> for DatabaseProcessor {
+    type Output = bool;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:UpdateCalenderEventPrivacy", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateCalenderEventPrivacy) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            UPDATE memory.calender_event
+            SET privacy = $2,
+                updated_at = (now() AT TIME ZONE 'utc')
+            WHERE id = $1
+            "#,
+            input.id,
+            input.privacy as PrivacyControlFlag,
+        )
+        .execute(self.db())
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+}
+
 /// Paginated list of events belonging to a calendar, ordered by time ascending.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListCalenderEventsByCalendar {
@@ -219,7 +257,8 @@ impl Processor<ListCalenderEventsByCalendar> for DatabaseProcessor {
                 repeat AS "repeat: CalenderEventRepeat",
                 repeat_until,
                 created_at,
-                updated_at
+                updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.calender_event
             WHERE calendar_id = $1
             ORDER BY time ASC
@@ -263,7 +302,8 @@ impl Processor<ListCalenderEventsInRange> for DatabaseProcessor {
                 repeat AS "repeat: CalenderEventRepeat",
                 repeat_until,
                 created_at,
-                updated_at
+                updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.calender_event
             WHERE calendar_id = $1
               AND time >= $2

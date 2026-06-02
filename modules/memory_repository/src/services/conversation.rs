@@ -8,8 +8,9 @@ use crate::entities::db::{
     conversation::{
         CloseConversation, ConversationEntity, CreateConversation, DeleteConversation,
         FindConversationById, ListRecentConversations, TouchConversation,
-        UpdateConversationOpeningSummary,
+        UpdateConversationOpeningSummary, UpdateConversationPrivacy,
     },
+    PrivacyControlFlag,
     conversation_content::{
         ConversationContentEntity, DeleteConversationContent, FindConversationContentById,
         ListConversationContentByMessage,
@@ -40,6 +41,8 @@ fn now_unix() -> i64 {
 #[derive(Debug, Clone)]
 pub struct CreateConversationRequest {
     pub opening_summary: String,
+    /// Audience visibility for the new conversation.
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateConversationRequest> for ConversationService {
@@ -55,6 +58,7 @@ impl Processor<CreateConversationRequest> for ConversationService {
                 opening_summary: input.opening_summary,
                 created_at: ts,
                 updated_at: ts,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -100,6 +104,29 @@ impl Processor<UpdateOpeningSummaryRequest> for ConversationService {
             .process(UpdateConversationOpeningSummary {
                 id: input.id,
                 opening_summary: input.opening_summary,
+            })
+            .await?)
+    }
+}
+
+/// Reassign the [`PrivacyControlFlag`] of a conversation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateConversationPrivacyRequest {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateConversationPrivacyRequest> for ConversationService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateConversationPrivacyRequest", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateConversationPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateConversationPrivacy {
+                id: input.id,
+                privacy: input.privacy,
             })
             .await?)
     }

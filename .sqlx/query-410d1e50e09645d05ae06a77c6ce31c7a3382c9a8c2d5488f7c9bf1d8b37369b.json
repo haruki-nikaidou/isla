@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE memory.calender_daily_event\n            SET privacy = $2,\n                updated = (now() AT TIME ZONE 'utc')\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "410d1e50e09645d05ae06a77c6ce31c7a3382c9a8c2d5488f7c9bf1d8b37369b"
+}

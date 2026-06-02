@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                calendar_id,\n                title,\n                description,\n                date,\n                repeat AS \"repeat: DailyEventRepeat\",\n                repeat_until,\n                created,\n                updated\n            FROM memory.calender_daily_event\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "query": "\n            SELECT\n                id,\n                calendar_id,\n                title,\n                description,\n                date,\n                repeat AS \"repeat: DailyEventRepeat\",\n                repeat_until,\n                created,\n                updated,\n                privacy AS \"privacy: PrivacyControlFlag\"\n            FROM memory.calender_daily_event\n            WHERE calendar_id = $1\n              AND date >= $2\n              AND date <= $3\n            ORDER BY date ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -59,11 +59,29 @@
         "ordinal": 8,
         "name": "updated",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 9,
+        "name": "privacy: PrivacyControlFlag",
+        "type_info": {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Uuid",
+        "Date",
+        "Date"
       ]
     },
     "nullable": [
@@ -75,8 +93,9 @@
       false,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "206cb4f6e606aebb4bce42fd645c9bcddd1aea113313502e9eb9961a5be65f18"
+  "hash": "5b158c9b5f8a242fbf3a145f8f8f406c0a28c59fd72831bab05a8524450c3868"
 }

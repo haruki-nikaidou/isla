@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT id, title, date, summary, content, created_at, updated_at\n            FROM memory.diary\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "query": "\n            SELECT\n                id, title, date, summary, content, created_at, updated_at,\n                privacy AS \"privacy: PrivacyControlFlag\"\n            FROM memory.diary\n            WHERE id = $1\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -37,6 +37,22 @@
         "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 7,
+        "name": "privacy: PrivacyControlFlag",
+        "type_info": {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
       }
     ],
     "parameters": {
@@ -51,8 +67,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "f4348499ccf76846fcf8307633db40b221c3179e4f6d3074e477ec279080077d"
+  "hash": "ec82cccbca3699bd19d2950ce2c3868221a2661b5d8ad980a7c34be7da1ff9a9"
 }

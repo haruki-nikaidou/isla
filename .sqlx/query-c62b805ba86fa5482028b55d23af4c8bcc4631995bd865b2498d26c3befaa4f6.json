@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                identity,\n                story_type AS \"story_type: StoryType\",\n                story_name,\n                story_summary,\n                story_text,\n                happened_at,\n                related_conversation\n            FROM memory.contact_story\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "query": "\n            SELECT\n                id,\n                identity,\n                story_type AS \"story_type: StoryType\",\n                story_name,\n                story_summary,\n                story_text,\n                happened_at,\n                related_conversation,\n                privacy AS \"privacy: PrivacyControlFlag\"\n            FROM memory.contact_story\n            WHERE id = $1\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -55,6 +55,22 @@
         "ordinal": 7,
         "name": "related_conversation",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "privacy: PrivacyControlFlag",
+        "type_info": {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
       }
     ],
     "parameters": {
@@ -70,8 +86,9 @@
       false,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "f432533f0338f5f1d101296ac48e53bcf47044dd0f4a143e96b0fb5405fcb2dd"
+  "hash": "c62b805ba86fa5482028b55d23af4c8bcc4631995bd865b2498d26c3befaa4f6"
 }

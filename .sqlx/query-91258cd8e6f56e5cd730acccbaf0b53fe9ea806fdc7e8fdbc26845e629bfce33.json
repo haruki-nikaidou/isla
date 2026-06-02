@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                token,\n                created_at,\n                expire_at,\n                max_accept_count,\n                role AS \"role: AccountRole\",\n                send_by\n            FROM auth.invitation\n            WHERE token = $1\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "token",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 2,
+        "name": "expire_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "max_accept_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "role: AccountRole",
+        "type_info": {
+          "Custom": {
+            "name": "auth.account_status",
+            "kind": {
+              "Enum": [
+                "Owner",
+                "Member"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "send_by",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "91258cd8e6f56e5cd730acccbaf0b53fe9ea806fdc7e8fdbc26845e629bfce33"
+}

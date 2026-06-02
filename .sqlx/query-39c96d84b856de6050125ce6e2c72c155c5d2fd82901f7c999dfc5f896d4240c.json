@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                calendar_id,\n                title,\n                description,\n                time,\n                repeat AS \"repeat: CalenderEventRepeat\",\n                repeat_until,\n                created_at,\n                updated_at\n            FROM memory.calender_event\n            WHERE calendar_id = $1\n              AND time >= $2\n              AND time <= $3\n            ORDER BY time ASC\n            ",
+  "query": "\n            SELECT\n                id,\n                calendar_id,\n                title,\n                description,\n                date,\n                repeat AS \"repeat: DailyEventRepeat\",\n                repeat_until,\n                created,\n                updated,\n                privacy AS \"privacy: PrivacyControlFlag\"\n            FROM memory.calender_daily_event\n            WHERE id = $1\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -25,20 +25,20 @@
       },
       {
         "ordinal": 4,
-        "name": "time",
-        "type_info": "Timestamptz"
+        "name": "date",
+        "type_info": "Date"
       },
       {
         "ordinal": 5,
-        "name": "repeat: CalenderEventRepeat",
+        "name": "repeat: DailyEventRepeat",
         "type_info": {
           "Custom": {
-            "name": "memory.calender_event_repeat",
+            "name": "memory.daily_event_repeat",
             "kind": {
               "Enum": [
                 "NoRepeat",
-                "EveryDay",
                 "EveryMonth",
+                "EveryYear",
                 "EveryWeekday"
               ]
             }
@@ -52,20 +52,34 @@
       },
       {
         "ordinal": 7,
-        "name": "created_at",
+        "name": "created",
         "type_info": "Timestamp"
       },
       {
         "ordinal": 8,
-        "name": "updated_at",
+        "name": "updated",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 9,
+        "name": "privacy: PrivacyControlFlag",
+        "type_info": {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Timestamptz",
-        "Timestamptz"
+        "Int8"
       ]
     },
     "nullable": [
@@ -77,8 +91,9 @@
       false,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "b5f25dc5d57bd7180fe6c17487c9b4b159f6a1cfacaed3ee56c89b9fca074e64"
+  "hash": "39c96d84b856de6050125ce6e2c72c155c5d2fd82901f7c999dfc5f896d4240c"
 }

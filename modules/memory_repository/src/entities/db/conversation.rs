@@ -4,6 +4,8 @@ use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::sqlx::DatabaseProcessor;
 
+use super::PrivacyControlFlag;
+
 /// A conversation session between the user and the agent.
 ///
 /// Conversations are the top-level container for a series of messages.
@@ -25,6 +27,10 @@ pub struct ConversationEntity {
 
     /// Unix timestamp of the last activity in this conversation.
     pub updated_at: i64,
+
+    /// Audience visibility for this conversation; gates whether the agent
+    /// may load it into the LLM context when chatting with a given peer.
+    pub privacy: PrivacyControlFlag,
 }
 
 /// Find a [`ConversationEntity`] by its bigserial primary key.
@@ -45,7 +51,13 @@ impl Processor<FindConversationById> for DatabaseProcessor {
         sqlx::query_as!(
             ConversationEntity,
             r#"
-            SELECT id, opening_summary, closing_summary, created_at, updated_at
+            SELECT
+                id,
+                opening_summary,
+                closing_summary,
+                created_at,
+                updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.conversation
             WHERE id = $1
             LIMIT 1
@@ -63,6 +75,7 @@ pub struct CreateConversation {
     pub opening_summary: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateConversation> for DatabaseProcessor {
@@ -73,13 +86,14 @@ impl Processor<CreateConversation> for DatabaseProcessor {
     async fn process(&self, input: CreateConversation) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar!(
             r#"
-            INSERT INTO memory.conversation (opening_summary, created_at, updated_at)
-            VALUES ($1, $2, $3)
+            INSERT INTO memory.conversation (opening_summary, created_at, updated_at, privacy)
+            VALUES ($1, $2, $3, $4)
             RETURNING id
             "#,
             input.opening_summary,
             input.created_at,
             input.updated_at,
+            input.privacy as PrivacyControlFlag,
         )
         .fetch_one(self.db())
         .await
@@ -197,6 +211,35 @@ impl Processor<DeleteConversation> for DatabaseProcessor {
     }
 }
 
+/// Reassign the [`PrivacyControlFlag`] of a conversation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateConversationPrivacy {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateConversationPrivacy> for DatabaseProcessor {
+    type Output = bool;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:UpdateConversationPrivacy", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateConversationPrivacy) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            UPDATE memory.conversation
+            SET privacy = $2
+            WHERE id = $1
+            "#,
+            input.id,
+            input.privacy as PrivacyControlFlag,
+        )
+        .execute(self.db())
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+}
+
 /// Paginated list of conversations ordered by most recent activity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListRecentConversations {
@@ -213,7 +256,13 @@ impl Processor<ListRecentConversations> for DatabaseProcessor {
         sqlx::query_as!(
             ConversationEntity,
             r#"
-            SELECT id, opening_summary, closing_summary, created_at, updated_at
+            SELECT
+                id,
+                opening_summary,
+                closing_summary,
+                created_at,
+                updated_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.conversation
             ORDER BY updated_at DESC
             LIMIT $1 OFFSET $2

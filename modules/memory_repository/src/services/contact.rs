@@ -14,13 +14,14 @@ use crate::entities::db::{
     contact_identity::{
         ContactIdentityEntity, CreateContactIdentity, DeleteContactIdentity,
         FindContactIdentityById, ListContactIdentities, Relationship,
-        UpdateContactIdentity, UpdateContactIdentityRelationship,
+        UpdateContactIdentity, UpdateContactIdentityPrivacy, UpdateContactIdentityRelationship,
     },
     contact_stories::{
         ContactStoryEntity, CreateContactStory, DeleteContactStory,
         FindContactStoryById, ListContactStoriesByIdentity, StoryType,
-        UpdateContactStory,
+        UpdateContactStory, UpdateContactStoryPrivacy,
     },
+    PrivacyControlFlag,
 };
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,7 @@ pub struct CreateContactIdentityRequest {
     pub identify_name: String,
     pub description: String,
     pub relationship: Relationship,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateContactIdentityRequest> for ContactService {
@@ -54,6 +56,7 @@ impl Processor<CreateContactIdentityRequest> for ContactService {
                 identify_name: input.identify_name,
                 description: input.description,
                 relationship: input.relationship,
+                privacy: input.privacy,
             })
             .await?;
         Ok(id)
@@ -128,6 +131,29 @@ impl Processor<UpdateRelationshipRequest> for ContactService {
             .process(UpdateContactIdentityRelationship {
                 id: input.id,
                 relationship: input.relationship,
+            })
+            .await?)
+    }
+}
+
+/// Reassign the [`PrivacyControlFlag`] of an identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateContactIdentityPrivacyRequest {
+    pub id: Uuid,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateContactIdentityPrivacyRequest> for ContactService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateContactIdentityPrivacyRequest", err, fields(id = %input.id))]
+    async fn process(&self, input: UpdateContactIdentityPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateContactIdentityPrivacy {
+                id: input.id,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -309,6 +335,7 @@ pub struct CreateStoryRequest {
     pub story_text: String,
     pub happened_at: PrimitiveDateTime,
     pub related_conversation: Option<i64>,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateStoryRequest> for ContactService {
@@ -330,6 +357,7 @@ impl Processor<CreateStoryRequest> for ContactService {
                 story_text: input.story_text,
                 happened_at: input.happened_at,
                 related_conversation: input.related_conversation,
+                privacy: input.privacy,
             })
             .await?)
     }
@@ -379,6 +407,29 @@ impl Processor<UpdateStoryRequest> for ContactService {
                 story_name: input.story_name,
                 story_summary: input.story_summary,
                 story_text: input.story_text,
+            })
+            .await?)
+    }
+}
+
+/// Reassign the [`PrivacyControlFlag`] of a story.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateStoryPrivacyRequest {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateStoryPrivacyRequest> for ContactService {
+    type Output = bool;
+    type Error = Error;
+
+    #[instrument(skip_all, name = "UpdateStoryPrivacyRequest", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateStoryPrivacyRequest) -> Result<bool, Error> {
+        Ok(self
+            .database
+            .process(UpdateContactStoryPrivacy {
+                id: input.id,
+                privacy: input.privacy,
             })
             .await?)
     }

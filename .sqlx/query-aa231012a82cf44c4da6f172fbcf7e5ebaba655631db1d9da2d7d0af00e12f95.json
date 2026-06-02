@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                identify_name,\n                description,\n                relationship AS \"relationship: Relationship\",\n                first_meet_at,\n                relationship_updated_at\n            FROM memory.contact_identity\n            ORDER BY identify_name ASC\n            LIMIT $1 OFFSET $2\n            ",
+  "query": "\n            SELECT\n                id,\n                identify_name,\n                description,\n                relationship AS \"relationship: Relationship\",\n                first_meet_at,\n                relationship_updated_at,\n                privacy AS \"privacy: PrivacyControlFlag\"\n            FROM memory.contact_identity\n            WHERE id = $1\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -45,12 +45,27 @@
         "ordinal": 5,
         "name": "relationship_updated_at",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 6,
+        "name": "privacy: PrivacyControlFlag",
+        "type_info": {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Int8",
-        "Int8"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -59,8 +74,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "d7a559224f16b9d035b7c2f2d50f052d1f97876a220d48ef60f2d590e346d639"
+  "hash": "aa231012a82cf44c4da6f172fbcf7e5ebaba655631db1d9da2d7d0af00e12f95"
 }

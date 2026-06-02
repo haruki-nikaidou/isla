@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO memory.calender_task\n                (calendar_id, title, description, start_at, deadline, status)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            RETURNING id\n            ",
+  "query": "\n            INSERT INTO memory.calender_task\n                (calendar_id, title, description, start_at, deadline, status, privacy)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            RETURNING id\n            ",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,18 @@
               ]
             }
           }
+        },
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
         }
       ]
     },
@@ -34,5 +46,5 @@
       false
     ]
   },
-  "hash": "28678f3047916c09f9627a497c21058603204c275bd7d5aad3f7e412e6e09c93"
+  "hash": "bf61ee93d522f79f58f701af27c792804ba774a75291fd9ee5b5b64a1ffc8f00"
 }

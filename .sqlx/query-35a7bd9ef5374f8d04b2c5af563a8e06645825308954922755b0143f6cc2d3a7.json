@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                name,\n                websites,\n                username,\n                password_encrypted,\n                password_hmac,\n                is_master_version,\n                created_at,\n                is_removed,\n                totp_url\n            FROM vault.ai_account\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "websites",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 3,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "password_encrypted",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "password_hmac",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_master_version",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_removed",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "totp_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "35a7bd9ef5374f8d04b2c5af563a8e06645825308954922755b0143f6cc2d3a7"
+}

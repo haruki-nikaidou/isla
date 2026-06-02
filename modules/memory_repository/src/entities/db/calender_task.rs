@@ -6,6 +6,8 @@ use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::sqlx::DatabaseProcessor;
 
+use super::PrivacyControlFlag;
+
 /// A task with a deadline, tracked within a calendar.
 ///
 /// Tasks differ from events in that they have a duration window (start to deadline)
@@ -35,6 +37,9 @@ pub struct CalenderTaskEntity {
 
     /// When the task status was last changed.
     pub status_update_at: PrimitiveDateTime,
+
+    /// Audience visibility for this task.
+    pub privacy: PrivacyControlFlag,
 }
 
 /// Progress state of a task.
@@ -90,7 +95,8 @@ impl Processor<FindCalenderTaskById> for DatabaseProcessor {
                 start_at,
                 deadline,
                 status AS "status: CalenderTaskStatus",
-                status_update_at
+                status_update_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.calender_task
             WHERE id = $1
             LIMIT 1
@@ -141,6 +147,7 @@ pub struct CreateCalenderTask {
     pub start_at: PrimitiveDateTime,
     pub deadline: PrimitiveDateTime,
     pub status: CalenderTaskStatus,
+    pub privacy: PrivacyControlFlag,
 }
 
 impl Processor<CreateCalenderTask> for DatabaseProcessor {
@@ -152,8 +159,8 @@ impl Processor<CreateCalenderTask> for DatabaseProcessor {
         sqlx::query_scalar!(
             r#"
             INSERT INTO memory.calender_task
-                (calendar_id, title, description, start_at, deadline, status)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (calendar_id, title, description, start_at, deadline, status, privacy)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
             "#,
             input.calendar_id,
@@ -162,6 +169,7 @@ impl Processor<CreateCalenderTask> for DatabaseProcessor {
             input.start_at,
             input.deadline,
             input.status as CalenderTaskStatus,
+            input.privacy as PrivacyControlFlag,
         )
         .fetch_one(self.db())
         .await
@@ -284,7 +292,8 @@ impl Processor<ListCalenderTasksByCalendar> for DatabaseProcessor {
                 start_at,
                 deadline,
                 status AS "status: CalenderTaskStatus",
-                status_update_at
+                status_update_at,
+                privacy AS "privacy: PrivacyControlFlag"
             FROM memory.calender_task
             WHERE calendar_id = $1
               AND ($2::memory.calender_task_status IS NULL OR status = $2)
@@ -298,6 +307,35 @@ impl Processor<ListCalenderTasksByCalendar> for DatabaseProcessor {
         )
         .fetch_all(self.db())
         .await
+    }
+}
+
+/// Reassign the [`PrivacyControlFlag`] of a task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateCalenderTaskPrivacy {
+    pub id: i64,
+    pub privacy: PrivacyControlFlag,
+}
+
+impl Processor<UpdateCalenderTaskPrivacy> for DatabaseProcessor {
+    type Output = bool;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:UpdateCalenderTaskPrivacy", err, fields(id = input.id))]
+    async fn process(&self, input: UpdateCalenderTaskPrivacy) -> Result<bool, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            UPDATE memory.calender_task
+            SET privacy = $2
+            WHERE id = $1
+            "#,
+            input.id,
+            input.privacy as PrivacyControlFlag,
+        )
+        .execute(self.db())
+        .await?
+        .rows_affected();
+        Ok(rows > 0)
     }
 }
 
