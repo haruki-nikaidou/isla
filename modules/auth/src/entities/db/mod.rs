@@ -1,3 +1,3 @@
 pub mod accounts;
-pub mod invivation;
+pub mod invitation;
 pub mod session;
