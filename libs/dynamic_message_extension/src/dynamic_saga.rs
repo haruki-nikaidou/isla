@@ -1,3 +1,4 @@
+use amqprs::BasicProperties;
 use amqprs::channel::Channel;
 use kanau::message::{MessageDe, MessageSer};
 use serde::Serialize;
@@ -47,9 +48,10 @@ where
     T: Serialize,
     Self: MessageSer,
 {
-    pub async fn send(
+    pub async fn send_with_prop(
         self,
         pool: &AmqpPool,
+        properties: BasicProperties,
     ) -> Result<(), wakuwaku::Error> {
         let routing_key = self.routing_key.clone();
         let exchange_name = self.exchange_name.clone();
@@ -67,7 +69,7 @@ where
             .await?;
         channel
             .basic_publish(
-                amqprs::BasicProperties::default(),
+                properties,
                 bytes.into_vec(),
                 amqprs::channel::BasicPublishArguments::new(&exchange_name, &routing_key)
                     .mandatory(true)
@@ -75,6 +77,9 @@ where
             )
             .await?;
         Ok(())
+    }
+    pub async fn send(self, pool: &AmqpPool) -> Result<(), wakuwaku::Error> {
+        self.send_with_prop(pool, BasicProperties::default()).await
     }
 }
 
