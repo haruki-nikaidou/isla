@@ -172,13 +172,10 @@ impl Processor<DeleteContact> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:DeleteContact", err, fields(id = input.id))]
     async fn process(&self, input: DeleteContact) -> Result<bool, sqlx::Error> {
-        let rows = sqlx::query!(
-            "DELETE FROM memory.contact WHERE id = $1",
-            input.id,
-        )
-        .execute(self.db())
-        .await?
-        .rows_affected();
+        let rows = sqlx::query!("DELETE FROM memory.contact WHERE id = $1", input.id,)
+            .execute(self.db())
+            .await?
+            .rows_affected();
         Ok(rows > 0)
     }
 }
@@ -194,7 +191,10 @@ impl Processor<ListContactsByIdentity> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:ListContactsByIdentity", err, fields(identity = %input.identity))]
-    async fn process(&self, input: ListContactsByIdentity) -> Result<Vec<ContactEntity>, sqlx::Error> {
+    async fn process(
+        &self,
+        input: ListContactsByIdentity,
+    ) -> Result<Vec<ContactEntity>, sqlx::Error> {
         sqlx::query_as!(
             ContactEntity,
             r#"

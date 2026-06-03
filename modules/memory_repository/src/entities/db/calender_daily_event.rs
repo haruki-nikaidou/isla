@@ -210,10 +210,7 @@ impl Processor<UpdateCalenderDailyEventPrivacy> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:UpdateCalenderDailyEventPrivacy", err, fields(id = input.id))]
-    async fn process(
-        &self,
-        input: UpdateCalenderDailyEventPrivacy,
-    ) -> Result<bool, sqlx::Error> {
+    async fn process(&self, input: UpdateCalenderDailyEventPrivacy) -> Result<bool, sqlx::Error> {
         let rows = sqlx::query!(
             r#"
             UPDATE memory.calender_daily_event

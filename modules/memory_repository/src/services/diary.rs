@@ -3,14 +3,14 @@
 use kanau::processor::Processor;
 use time::Date;
 use tracing::instrument;
-use wakuwaku::{sqlx::DatabaseProcessor, Error};
+use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::{
+    PrivacyControlFlag,
     diary::{
         CreateDiary, DeleteDiary, DiaryEntity, FindDiaryByDate, FindDiaryById, ListDiaries,
         UpdateDiary, UpdateDiaryPrivacy,
     },
-    PrivacyControlFlag,
 };
 
 #[derive(Debug, Clone)]
@@ -155,10 +155,7 @@ impl Processor<DeleteDiaryRequest> for DiaryService {
 
     #[instrument(skip_all, name = "DeleteDiaryRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteDiaryRequest) -> Result<bool, Error> {
-        Ok(self
-            .database
-            .process(DeleteDiary { id: input.id })
-            .await?)
+        Ok(self.database.process(DeleteDiary { id: input.id }).await?)
     }
 }
 

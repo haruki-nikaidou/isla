@@ -252,13 +252,10 @@ impl Processor<DeleteCalenderTask> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:DeleteCalenderTask", err, fields(id = input.id))]
     async fn process(&self, input: DeleteCalenderTask) -> Result<bool, sqlx::Error> {
-        let rows = sqlx::query!(
-            "DELETE FROM memory.calender_task WHERE id = $1",
-            input.id,
-        )
-        .execute(self.db())
-        .await?
-        .rows_affected();
+        let rows = sqlx::query!("DELETE FROM memory.calender_task WHERE id = $1", input.id,)
+            .execute(self.db())
+            .await?
+            .rows_affected();
         Ok(rows > 0)
     }
 }

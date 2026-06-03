@@ -6,19 +6,19 @@ use wakuwaku::sqlx::DatabaseProcessor;
 
 #[derive(Debug, Clone)]
 /// Account for owner and trusted members.
-/// 
+///
 /// - Schema: `auth`
 /// - Table Name: `account`
 pub struct AccountEntity {
     /// Primary key
     pub id: Uuid,
-    
+
     /// Unique username
     pub username: String,
-    
+
     /// Argon2 hashed password
     pub password: String,
-    
+
     /// The time user registered. Readonly after creation.
     pub registered_at: PrimitiveDateTime,
 }

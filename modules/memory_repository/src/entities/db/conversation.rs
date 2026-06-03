@@ -112,10 +112,7 @@ impl Processor<UpdateConversationOpeningSummary> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:UpdateConversationOpeningSummary", err, fields(id = input.id))]
-    async fn process(
-        &self,
-        input: UpdateConversationOpeningSummary,
-    ) -> Result<bool, sqlx::Error> {
+    async fn process(&self, input: UpdateConversationOpeningSummary) -> Result<bool, sqlx::Error> {
         let rows = sqlx::query!(
             r#"
             UPDATE memory.conversation
@@ -200,13 +197,10 @@ impl Processor<DeleteConversation> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:DeleteConversation", err, fields(id = input.id))]
     async fn process(&self, input: DeleteConversation) -> Result<bool, sqlx::Error> {
-        let rows = sqlx::query!(
-            "DELETE FROM memory.conversation WHERE id = $1",
-            input.id,
-        )
-        .execute(self.db())
-        .await?
-        .rows_affected();
+        let rows = sqlx::query!("DELETE FROM memory.conversation WHERE id = $1", input.id,)
+            .execute(self.db())
+            .await?
+            .rows_affected();
         Ok(rows > 0)
     }
 }
@@ -252,7 +246,10 @@ impl Processor<ListRecentConversations> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:ListRecentConversations", err)]
-    async fn process(&self, input: ListRecentConversations) -> Result<Vec<ConversationEntity>, sqlx::Error> {
+    async fn process(
+        &self,
+        input: ListRecentConversations,
+    ) -> Result<Vec<ConversationEntity>, sqlx::Error> {
         sqlx::query_as!(
             ConversationEntity,
             r#"

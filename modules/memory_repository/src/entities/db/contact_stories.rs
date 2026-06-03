@@ -183,13 +183,10 @@ impl Processor<DeleteContactStory> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:DeleteContactStory", err, fields(id = input.id))]
     async fn process(&self, input: DeleteContactStory) -> Result<bool, sqlx::Error> {
-        let rows = sqlx::query!(
-            "DELETE FROM memory.contact_story WHERE id = $1",
-            input.id,
-        )
-        .execute(self.db())
-        .await?
-        .rows_affected();
+        let rows = sqlx::query!("DELETE FROM memory.contact_story WHERE id = $1", input.id,)
+            .execute(self.db())
+            .await?
+            .rows_affected();
         Ok(rows > 0)
     }
 }

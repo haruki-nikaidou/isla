@@ -4,24 +4,23 @@ use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
 use uuid::Uuid;
-use wakuwaku::{sqlx::DatabaseProcessor, Error};
+use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::{
+    PrivacyControlFlag,
     contact::{
-        ContactEntity, CreateContact, DeleteContact, FindContactById,
-        FindContactByPlatformUser, ListContactsByIdentity, UpdateContact,
+        ContactEntity, CreateContact, DeleteContact, FindContactById, FindContactByPlatformUser,
+        ListContactsByIdentity, UpdateContact,
     },
     contact_identity::{
         ContactIdentityEntity, CreateContactIdentity, DeleteContactIdentity,
-        FindContactIdentityById, ListContactIdentities, Relationship,
-        UpdateContactIdentity, UpdateContactIdentityPrivacy, UpdateContactIdentityRelationship,
+        FindContactIdentityById, ListContactIdentities, Relationship, UpdateContactIdentity,
+        UpdateContactIdentityPrivacy, UpdateContactIdentityRelationship,
     },
     contact_stories::{
-        ContactStoryEntity, CreateContactStory, DeleteContactStory,
-        FindContactStoryById, ListContactStoriesByIdentity, StoryType,
-        UpdateContactStory, UpdateContactStoryPrivacy,
+        ContactStoryEntity, CreateContactStory, DeleteContactStory, FindContactStoryById,
+        ListContactStoriesByIdentity, StoryType, UpdateContactStory, UpdateContactStoryPrivacy,
     },
-    PrivacyControlFlag,
 };
 
 #[derive(Debug, Clone)]

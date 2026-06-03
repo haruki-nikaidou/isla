@@ -168,10 +168,7 @@ impl Processor<UpdateContactIdentityRelationship> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:UpdateContactIdentityRelationship", err, fields(id = %input.id))]
-    async fn process(
-        &self,
-        input: UpdateContactIdentityRelationship,
-    ) -> Result<bool, sqlx::Error> {
+    async fn process(&self, input: UpdateContactIdentityRelationship) -> Result<bool, sqlx::Error> {
         let rows = sqlx::query!(
             r#"
             UPDATE memory.contact_identity
@@ -252,7 +249,10 @@ impl Processor<ListContactIdentities> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:ListContactIdentities", err)]
-    async fn process(&self, input: ListContactIdentities) -> Result<Vec<ContactIdentityEntity>, sqlx::Error> {
+    async fn process(
+        &self,
+        input: ListContactIdentities,
+    ) -> Result<Vec<ContactIdentityEntity>, sqlx::Error> {
         sqlx::query_as!(
             ContactIdentityEntity,
             r#"

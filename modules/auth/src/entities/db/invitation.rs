@@ -26,7 +26,7 @@ pub struct InvitationEntity {
     pub role: AccountRole,
 
     /// Foreign key to [AccountEntity](super::accounts::AccountEntity)
-    pub send_by: Uuid
+    pub send_by: Uuid,
 }
 
 /// Find an [`InvitationEntity`] by its primary-key token.

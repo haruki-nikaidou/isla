@@ -2,15 +2,15 @@
 
 use kanau::processor::Processor;
 use tracing::instrument;
-use wakuwaku::{sqlx::DatabaseProcessor, Error};
+use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::{
+    PrivacyControlFlag,
     conversation::{
         CloseConversation, ConversationEntity, CreateConversation, DeleteConversation,
         FindConversationById, ListRecentConversations, TouchConversation,
         UpdateConversationOpeningSummary, UpdateConversationPrivacy,
     },
-    PrivacyControlFlag,
     conversation_content::{
         ConversationContentEntity, DeleteConversationContent, FindConversationContentById,
         ListConversationContentByMessage,

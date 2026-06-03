@@ -18,7 +18,7 @@
 //!   answer, with their parameter and return JSON Schemas.
 
 pub mod plugin;
-pub mod plugin_namespace;
-pub mod plugin_tool;
-pub mod plugin_skills;
 pub mod plugin_memory;
+pub mod plugin_namespace;
+pub mod plugin_skills;
+pub mod plugin_tool;

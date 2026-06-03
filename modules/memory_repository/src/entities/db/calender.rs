@@ -39,7 +39,10 @@ impl Processor<FindCalenderById> for DatabaseProcessor {
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:FindCalenderById", err, fields(id = %input.id))]
-    async fn process(&self, input: FindCalenderById) -> Result<Option<CalenderEntity>, sqlx::Error> {
+    async fn process(
+        &self,
+        input: FindCalenderById,
+    ) -> Result<Option<CalenderEntity>, sqlx::Error> {
         sqlx::query_as!(
             CalenderEntity,
             r#"
@@ -131,13 +134,10 @@ impl Processor<DeleteCalender> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:DeleteCalender", err, fields(id = %input.id))]
     async fn process(&self, input: DeleteCalender) -> Result<bool, sqlx::Error> {
-        let rows = sqlx::query!(
-            "DELETE FROM memory.calender WHERE id = $1",
-            input.id,
-        )
-        .execute(self.db())
-        .await?
-        .rows_affected();
+        let rows = sqlx::query!("DELETE FROM memory.calender WHERE id = $1", input.id,)
+            .execute(self.db())
+            .await?
+            .rows_affected();
         Ok(rows > 0)
     }
 }

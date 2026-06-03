@@ -176,13 +176,10 @@ impl Processor<DeleteDiary> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:DeleteDiary", err, fields(id = input.id))]
     async fn process(&self, input: DeleteDiary) -> Result<bool, sqlx::Error> {
-        let rows = sqlx::query!(
-            "DELETE FROM memory.diary WHERE id = $1",
-            input.id,
-        )
-        .execute(self.db())
-        .await?
-        .rows_affected();
+        let rows = sqlx::query!("DELETE FROM memory.diary WHERE id = $1", input.id,)
+            .execute(self.db())
+            .await?
+            .rows_affected();
         Ok(rows > 0)
     }
 }
