@@ -1,12 +1,106 @@
-use amqprs::channel::{BasicAckArguments, BasicNackArguments};
-use amqprs::{BasicProperties, FieldName, FieldValue};
+use crate::dynamic_saga::SagaCallResponse;
+use amqprs::channel::{BasicAckArguments, BasicNackArguments, Channel, ConfirmSelectArguments};
+use amqprs::{BasicProperties, FieldName, FieldTable, FieldValue};
 use kanau::message::MessageDe;
+use kanau::message::MessageSer;
 use ring::signature;
+use ring::signature::Ed25519KeyPair;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::pin::Pin;
 use std::sync::Arc;
+use wakuwaku::Error;
 use wakuwaku::amqp::{AmqpMessageProcessor, AmqpMessageSend, ack, nack};
+use wakuwaku::amqp::{AmqpPool, AmqpRouting};
+use wakuwaku::pool::Pooled;
 
+pub struct ClusterMessage<T>(pub T);
+
+impl<T: MessageSer> ClusterMessage<T> {}
+
+impl<T: MessageSer> MessageSer for ClusterMessage<T> {
+    type SerError = T::SerError;
+
+    fn to_bytes(self) -> Result<Box<[u8]>, Self::SerError> {
+        self.0.to_bytes()
+    }
+}
+
+impl<T: MessageSer + AmqpRouting> AmqpRouting for ClusterMessage<T> {
+    const EXCHANGE: &'static str = T::EXCHANGE;
+    const EXCHANGE_TYPE: wakuwaku::amqp::AmqpExchangeType = T::EXCHANGE_TYPE;
+    const ROUTING_KEY: &'static str = T::ROUTING_KEY;
+}
+
+pub struct ClusterMessageSender {
+    pool: AmqpPool,
+    key: Ed25519KeyPair,
+}
+
+impl ClusterMessageSender {
+    pub fn new(pool: AmqpPool, key: Ed25519KeyPair) -> Self {
+        Self { pool, key }
+    }
+    pub fn sign(&self, bytes: &[u8]) -> Vec<u8> {
+        let mut sha = Sha256::new();
+        sha.update(bytes);
+        let body_hash = sha.finalize();
+        self.key.sign(body_hash.as_slice()).as_ref().to_vec()
+    }
+    pub fn get_sign_header(&self, bytes: &[u8]) -> Result<(FieldName, FieldValue), anyhow::Error> {
+        let name = FieldName::try_from(CLUSTER_SIGNATURE_HEADER)?;
+        let signature = self.sign(bytes);
+        let value = FieldValue::x(amqprs::ByteArray::try_from(signature)?);
+        Ok((name, value))
+    }
+    pub async fn send<T: AmqpMessageSend>(&self, message: T) -> Result<(), Error> {
+        let message_bytes = message.to_bytes().map_err(Into::into)?;
+        let mut header_map = FieldTable::new();
+        let (k, v) = self
+            .get_sign_header(&message_bytes)
+            .map_err(Error::BusinessPanic)?;
+        header_map.insert(k, v);
+        let prop = BasicProperties::default()
+            .with_headers(header_map)
+            .to_owned();
+        let channel: Result<Pooled<Channel, _>, Error> = self.pool.get().await.into();
+        let channel = channel?;
+        let channel = channel
+            .get_ref()
+            .ok_or(Error::Io(anyhow::anyhow!("Channel is unexpectedly closed")))?;
+        channel
+            .confirm_select(ConfirmSelectArguments::new(false))
+            .await?;
+        channel
+            .basic_publish(
+                prop,
+                message_bytes.into_vec(),
+                amqprs::channel::BasicPublishArguments::new(T::EXCHANGE, T::ROUTING_KEY)
+                    .mandatory(true)
+                    .finish(),
+            )
+            .await?;
+        Ok(())
+    }
+    pub async fn send_saga<T: Serialize + Clone>(
+        &self,
+        saga_message: SagaCallResponse<T>,
+    ) -> Result<(), Error>
+    where
+        SagaCallResponse<T>: MessageSer,
+    {
+        let message_bytes = saga_message.clone().to_bytes().map_err(Into::into)?;
+        let mut header_map = FieldTable::new();
+        let (k, v) = self
+            .get_sign_header(&message_bytes)
+            .map_err(Error::BusinessPanic)?;
+        header_map.insert(k, v);
+        let prop = BasicProperties::default()
+            .with_headers(header_map)
+            .to_owned();
+        saga_message.send_with_prop(&self.pool, prop).await
+    }
+}
 #[derive(Clone, Copy)]
 pub struct ClusterMessageVerifier {
     pub public_key: signature::UnparsedPublicKey<[u8; 32]>,

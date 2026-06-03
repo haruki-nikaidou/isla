@@ -24,6 +24,28 @@ where
     }
 }
 
+impl<T> From<SagaCallRequest<T>> for SagaCallResponse<T> {
+    fn from(request: SagaCallRequest<T>) -> Self {
+        Self {
+            body: request.body,
+            context_id: request.context_id,
+            routing_key: request.routing_key,
+            exchange_name: request.exchange_name,
+        }
+    }
+}
+
+impl<T> From<SagaCallResponse<T>> for SagaCallRequest<T> {
+    fn from(response: SagaCallResponse<T>) -> Self {
+        Self {
+            body: response.body,
+            context_id: response.context_id,
+            routing_key: response.routing_key,
+            exchange_name: response.exchange_name,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct SagaCallResponse<T> {
     pub body: T,
