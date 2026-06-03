@@ -527,6 +527,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
+name = "dynamic_message_extension"
+version = "0.1.0"
+dependencies = [
+ "amqprs",
+ "anyhow",
+ "kanau",
+ "serde",
+ "serde_json",
+ "uuid",
+ "wakuwaku",
+]
+
+[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1909,19 +1922,6 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
-
-[[package]]
-name = "saga_helper"
-version = "0.1.0"
-dependencies = [
- "amqprs",
- "anyhow",
- "kanau",
- "serde",
- "serde_json",
- "uuid",
- "wakuwaku",
-]
 
 [[package]]
 name = "scopeguard"

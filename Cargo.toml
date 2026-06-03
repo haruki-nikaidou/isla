@@ -2,8 +2,7 @@
 resolver = "3"
 members = [
     "binary/admin-tool",
-    "binary/server",
-    "libs/saga_helper",
+    "binary/server", "libs/dynamic_message_extension",
     "modules/administration",
     "modules/ai_caller",
     "modules/auth",
@@ -87,7 +86,6 @@ smallvec = { version = "1.14.0", features = [
     "const_generics",
     "const_new",
 ] }
-saga_helper = { path = "libs/saga_helper" }
 
 # External tools
 reqwest = { version = "0.12", features = ["json", "gzip", "brotli", "zstd", "deflate", "multipart", "stream"] }

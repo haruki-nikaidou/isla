@@ -1,5 +1,5 @@
 [package]
-name = "saga_helper"
+name = "dynamic_message_extension"
 version = "0.1.0"
 edition = "2024"
 
