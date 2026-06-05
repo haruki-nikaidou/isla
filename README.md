@@ -10,8 +10,6 @@ The name *Isla* comes from the anime *Plastic Memories*. It is a reminder to
 never forget the limitations of AI, to never think AI is the same as a human,
 and that AI can behave crazily. And, because she is a cute girl.
 
----
-
 ## Philosophy
 
 Isla is built on two opinions.
@@ -42,8 +40,6 @@ Concretely, this means:
   `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` in every
   crate.
 
----
-
 ## Architecture
 
 Isla is a cluster of focused microservices that cooperate through a shared set
@@ -68,15 +64,15 @@ of contracts, messaging patterns, and observability tooling.
 
 | Traffic                        | Transport            | Payload |
 | ------------------------------ | -------------------- | ------- |
-| Intra-cluster module-to-module | gRPC                 | Protobuf |
+| Intra-cluster module-to-module | RabbitM              | JSON    |
 | `webui` ↔ `interface` module   | gRPC                 | Protobuf |
 | `dashboard` ↔ most modules     | gRPC                 | Protobuf |
 | Plugin ↔ cluster               | RabbitMQ (AMQP)      | JSON    |
 | Persistent state               | PostgreSQL           | —       |
 | Caches / ephemeral state       | Redis                | —       |
 
-The gRPC stack is reserved for in-cluster service-to-service calls (including
-the first-party `webui` and `dashboard`). Plugins always talk to the cluster
+The gRPC stack is reserved for in-cluster user-to-service calls (including
+the first-party `webui` and `dashboard`). Plugins and modules always talk to the cluster
 via JSON messages over RabbitMQ, so that a plugin can be implemented in any
 programming language and hosted anywhere the broker is reachable.
 
@@ -153,8 +149,6 @@ Each plugin can emit these events:
 
 A reference plugin lives at `plugin/gmail`.
 
----
-
 ## Repository layout
 
 ```
@@ -179,8 +173,6 @@ plugin/
 webui/            # default end-user web chat UI (swappable, may be removed)
 dashboard/        # default admin/ops dashboard (swappable, may be removed)
 ```
-
----
 
 ## License
 
