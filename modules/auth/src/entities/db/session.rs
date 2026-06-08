@@ -53,3 +53,132 @@ impl Processor<FindSessionBySerial> for DatabaseProcessor {
         .await
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct FindSessionById {
+    pub session_id: String,
+}
+
+impl Processor<FindSessionById> for DatabaseProcessor {
+    type Output = Option<SessionEntity>;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:FindSessionById", err)]
+    async fn process(&self, input: FindSessionById) -> Result<Option<SessionEntity>, sqlx::Error> {
+        sqlx::query_as!(
+            SessionEntity,
+            r#"
+            SELECT serial, user_id, session_id, last_refreshed, expires
+            FROM auth.session
+            WHERE session_id = $1
+            LIMIT 1
+            "#,
+            input.session_id,
+        )
+        .fetch_optional(self.db())
+        .await
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ListUserSessions {
+    pub user_id: Uuid,
+}
+
+impl Processor<ListUserSessions> for DatabaseProcessor {
+    type Output = Vec<SessionEntity>;
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:ListUserSessions", err)]
+    async fn process(&self, input: ListUserSessions) -> Result<Vec<SessionEntity>, sqlx::Error> {
+        sqlx::query_as!(
+            SessionEntity,
+            r#"
+            SELECT serial, user_id, session_id, last_refreshed, expires
+            FROM auth.session
+            WHERE user_id = $1
+            "#,
+            input.user_id
+        )
+        .fetch_all(self.db())
+        .await
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TerminateSession {
+    pub session_serial: i64,
+}
+
+impl Processor<TerminateSession> for DatabaseProcessor {
+    type Output = ();
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:TerminateSession", err)]
+    async fn process(&self, input: TerminateSession) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            DELETE FROM auth.session
+            WHERE serial = $1
+            "#,
+            input.session_serial
+        )
+        .execute(self.db())
+        .await?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TouchSession {
+    pub serial: i64,
+    pub expires: PrimitiveDateTime,
+}
+
+impl Processor<TouchSession> for DatabaseProcessor {
+    type Output = ();
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:TouchSession", err)]
+    async fn process(&self, input: TouchSession) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            UPDATE auth.session
+            SET last_refreshed = now(), expires = $2
+            WHERE serial = $1
+            "#,
+            input.serial,
+            input.expires
+        )
+        .execute(self.db())
+        .await?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateSession {
+    pub user_id: Uuid,
+    pub session_id: String,
+    pub created_at: PrimitiveDateTime,
+    pub expires: PrimitiveDateTime,
+}
+
+impl Processor<CreateSession> for DatabaseProcessor {
+    type Output = SessionEntity;
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:CreateSession", err)]
+    async fn process(&self, input: CreateSession) -> Result<SessionEntity, sqlx::Error> {
+        sqlx::query_as!(
+            SessionEntity,
+            r#"    
+            INSERT INTO auth.session
+            (user_id, session_id, last_refreshed, expires) VALUES ($1, $2, $3, $4)
+            RETURNING serial, user_id, session_id, last_refreshed, expires
+            "#,
+            input.user_id,
+            input.session_id,
+            input.created_at,
+            input.expires,
+        )
+        .fetch_one(self.db())
+        .await
+    }
+}
