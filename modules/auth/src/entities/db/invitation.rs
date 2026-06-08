@@ -64,3 +64,40 @@ impl Processor<FindInvitationByToken> for DatabaseProcessor {
         .await
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ListInvitationsByUser {
+    pub user_id: Uuid,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+impl Processor<ListInvitationsByUser> for DatabaseProcessor {
+    type Output = Vec<InvitationEntity>;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:ListInvitationsByUser", err)]
+    async fn process(&self, input: ListInvitationsByUser) -> Result<Self::Output, Self::Error> {
+        sqlx::query_as!(
+            InvitationEntity,
+            r#"
+            SELECT
+                token,
+                created_at,
+                expire_at,
+                max_accept_count,
+                role AS  "role: AccountRole",
+                send_by
+            FROM auth.invitation
+            WHERE send_by = $1
+            LIMIT $2
+            OFFSET $3
+            "#,
+            input.user_id,
+            input.limit,
+            input.offset
+        )
+        .fetch_all(self.db())
+        .await
+    }
+}
