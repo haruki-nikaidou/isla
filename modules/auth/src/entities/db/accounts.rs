@@ -56,3 +56,60 @@ impl Processor<FindAccountById> for DatabaseProcessor {
         .await
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FindUserByUsername {
+    pub username: String,
+}
+
+impl Processor<FindUserByUsername> for DatabaseProcessor {
+    type Output = Option<AccountEntity>;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:FindUserByUsername", err)]
+    async fn process(
+        &self,
+        input: FindUserByUsername,
+    ) -> Result<Option<AccountEntity>, sqlx::Error> {
+        sqlx::query_as!(
+            AccountEntity,
+            r#"
+            SELECT id, username, password, registered_at
+            FROM auth.account
+            WHERE username = $1
+            LIMIT 1
+            "#,
+            input.username,
+        )
+        .fetch_optional(self.db())
+        .await
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListAllUsers {
+    pub limit: i64,
+    pub offset: i64,
+}
+
+impl Processor<ListAllUsers> for DatabaseProcessor {
+    type Output = Vec<AccountEntity>;
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:ListAllUsers", err)]
+    async fn process(&self, input: ListAllUsers) -> Result<Vec<AccountEntity>, sqlx::Error> {
+        sqlx::query_as!(
+            AccountEntity,
+            r#"
+            SELECT id, username, password, registered_at
+            FROM auth.account
+            ORDER BY registered_at DESC
+            LIMIT $1
+            OFFSET $2
+            "#,
+            input.limit,
+            input.offset,
+        )
+        .fetch_all(self.db())
+        .await
+    }
+}
