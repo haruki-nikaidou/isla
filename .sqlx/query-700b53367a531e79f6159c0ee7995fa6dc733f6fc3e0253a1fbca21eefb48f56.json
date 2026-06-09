@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                i.max_accept_count AS \"limit\",\n                COUNT(r.id) AS \"current!\"\n            FROM auth.invitation AS i\n            LEFT JOIN auth.invitation_relation AS r ON r.invite_via = i.token\n            WHERE i.token = $1\n            GROUP BY i.max_accept_count\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "limit",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "current!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "700b53367a531e79f6159c0ee7995fa6dc733f6fc3e0253a1fbca21eefb48f56"
+}
