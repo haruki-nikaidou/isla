@@ -23,3 +23,4 @@
 
 pub mod entities;
 pub mod scopes;
+pub mod module_config;
