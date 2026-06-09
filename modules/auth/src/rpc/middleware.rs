@@ -1,3 +1,4 @@
+use crate::services::session::SessionService;
 use tonic::Status;
 use tonic::codegen::BoxFuture;
 use tonic::codegen::http::HeaderMap;
@@ -7,7 +8,7 @@ use wakuwaku::sqlx::DatabaseProcessor;
 
 #[derive(Clone)]
 pub struct AuthLayer {
-    pub db: DatabaseProcessor,
+    pub service: SessionService,
 }
 
 impl<S> tower::Layer<S> for AuthLayer {
@@ -15,7 +16,7 @@ impl<S> tower::Layer<S> for AuthLayer {
     fn layer(&self, service: S) -> Self::Service {
         AuthMiddleware {
             inner: service,
-            db: self.db.clone(),
+            service: self.service.clone(),
         }
     }
 }
@@ -23,7 +24,7 @@ impl<S> tower::Layer<S> for AuthLayer {
 #[derive(Clone)]
 pub struct AuthMiddleware<S> {
     inner: S,
-    db: DatabaseProcessor,
+    service: SessionService,
 }
 
 impl<S, ReqBody, ResBody> Service<tonic::codegen::http::Request<ReqBody>> for AuthMiddleware<S>
@@ -49,11 +50,11 @@ where
     }
 
     fn call(&mut self, mut req: tonic::codegen::http::Request<ReqBody>) -> Self::Future {
-        let db = self.db.clone();
+        let session_service = self.service.clone();
         let inner_clone = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner_clone);
         Box::pin(async move {
-            if let Ok(session_info) = user_auth(req.headers(), &db).await {
+            if let Ok(session_info) = user_auth(req.headers(), &session_service).await {
                 req.extensions_mut().insert(session_info);
             }
             inner.call(req).await
@@ -71,7 +72,7 @@ pub struct UserSessionInfo {
 
 async fn user_auth(
     metadata: &HeaderMap,
-    db: &DatabaseProcessor,
+    service: &SessionService,
 ) -> Result<UserSessionInfo, Status> {
     todo!()
 }
