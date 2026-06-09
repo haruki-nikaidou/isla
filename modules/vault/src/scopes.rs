@@ -163,7 +163,9 @@ impl Display for Scope {
 }
 
 /// Scope for accessing the object storage subsystem in the memory repository.
-pub static OBJECT_STORAGE_SCOPE: Scope = Scope(&["@isla", "memory_repository", "object_storage"]);
+pub const OBJECT_STORAGE_SCOPE: Scope = Scope(&["@isla", "memory_repository", "object_storage"]);
+
+pub const AUTH_SCOPE: Scope = Scope(&["@isla", "auth"]);
 
 #[cfg(test)]
 mod tests {

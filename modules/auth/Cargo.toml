@@ -11,10 +11,11 @@ time.workspace = true
 rand.workspace = true
 wakuwaku.workspace = true
 kanau.workspace = true
-rkyv.workspace = true
 redis.workspace = true
 tracing.workspace = true
 tower.workspace = true
 tonic.workspace = true
+serde.workspace = true
 sha2.workspace = true
 ring = "0.17"
+vault = {path = "../vault"}

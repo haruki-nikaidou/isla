@@ -130,7 +130,7 @@ dependencies = [
  "rand 0.9.4",
  "redis",
  "ring",
- "rkyv 0.8.16",
+ "serde",
  "sha2 0.10.9",
  "sqlx",
  "time",
@@ -138,6 +138,7 @@ dependencies = [
  "tower",
  "tracing",
  "uuid",
+ "vault",
  "wakuwaku",
 ]
 
