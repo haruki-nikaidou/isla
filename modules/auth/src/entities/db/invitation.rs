@@ -29,6 +29,24 @@ pub struct InvitationEntity {
     pub send_by: Uuid,
 }
 
+#[derive(Debug, Clone)]
+/// Invitation relation between two accounts
+///
+/// - Schema: `auth`
+/// - Table Name: `invitation_relation`
+pub struct InvitationRelationEntity {
+    pub id: i64,
+
+    /// The token of [InvitationEntity]
+    pub invite_via: Uuid,
+
+    /// The user registered by this invitation, foreign key to [AccountEntity](super::accounts::AccountEntity)
+    pub invitee: Uuid,
+
+    /// The time when the invitation is accepted
+    pub accepted_at: PrimitiveDateTime,
+}
+
 /// Find an [`InvitationEntity`] by its primary-key token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FindInvitationByToken {
@@ -99,5 +117,111 @@ impl Processor<ListInvitationsByUser> for DatabaseProcessor {
         )
         .fetch_all(self.db())
         .await
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CountInvitationUsedTimes {
+    pub pk: Uuid,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct InvitationUsedTimes {
+    pub pk: Uuid,
+    pub current: i64,
+    pub limit: Option<i64>,
+}
+
+impl Processor<CountInvitationUsedTimes> for DatabaseProcessor {
+    type Output = InvitationUsedTimes;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:CountInvitationUsedTimes", err, fields(token = %input.pk))]
+    async fn process(&self, input: CountInvitationUsedTimes) -> Result<Self::Output, Self::Error> {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                i.max_accept_count AS "limit",
+                COUNT(r.id) AS "current!"
+            FROM auth.invitation AS i
+            LEFT JOIN auth.invitation_relation AS r ON r.invite_via = i.token
+            WHERE i.token = $1
+            GROUP BY i.max_accept_count
+            "#,
+            input.pk,
+        )
+        .fetch_one(self.db())
+        .await?;
+
+        Ok(InvitationUsedTimes {
+            pk: input.pk,
+            current: row.current,
+            limit: row.limit,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateInvitation {
+    pub user_id: Uuid,
+    pub token: Uuid,
+    pub expire_at: PrimitiveDateTime,
+    pub max_accept_account: Option<i64>,
+}
+
+impl Processor<CreateInvitation> for DatabaseProcessor {
+    type Output = InvitationEntity;
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:CreateInvitation", err, fields(token = %input.token))]
+    async fn process(&self, input: CreateInvitation) -> Result<Self::Output, Self::Error> {
+        sqlx::query_as!(
+            InvitationEntity,
+            r#"
+            INSERT INTO auth.invitation (token, expire_at, max_accept_count, role, send_by)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING
+                token,
+                created_at,
+                expire_at,
+                max_accept_count,
+                role AS "role: AccountRole",
+                send_by
+            "#,
+            input.token,
+            input.expire_at,
+            input.max_accept_account,
+            AccountRole::Member as AccountRole,
+            input.user_id,
+        )
+        .fetch_one(self.db())
+        .await
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Invalid invitation by setting `max_accept_account` to 0.
+pub struct InvalidInvitation {
+    pub pk: Uuid,
+}
+
+impl Processor<InvalidInvitation> for DatabaseProcessor {
+    type Output = ();
+    type Error = sqlx::Error;
+
+    #[instrument(skip_all, name = "SQL:InvalidInvitation", err, fields(token = %input.pk))]
+    async fn process(&self, input: InvalidInvitation) -> Result<Self::Output, Self::Error> {
+        sqlx::query!(
+            r#"
+            UPDATE auth.invitation
+            SET max_accept_count = 0
+            WHERE token = $1
+            "#,
+            input.pk,
+        )
+        .execute(self.db())
+        .await?;
+
+        Ok(())
     }
 }
