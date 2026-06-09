@@ -8,6 +8,7 @@
 //! System scopes (prefixed with `@isla`) are reserved for internal Isla
 //! services.
 
+use std::fmt::Display;
 use compact_str::CompactString;
 use smallvec::{SmallVec, smallvec};
 use std::str::FromStr;
@@ -152,6 +153,12 @@ impl Scope {
     /// Returns `true` if this scope is a system scope (starts with `@isla`).
     pub fn is_system_scope(self) -> bool {
         SYSTEM_SCOPE_RANGE.matches(self)
+    }
+}
+
+impl Display for Scope {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", self.0.join("."))
     }
 }
 
