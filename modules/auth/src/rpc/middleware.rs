@@ -1,10 +1,10 @@
-use crate::services::session::SessionService;
+use crate::services::session::{SessionCheckRequest, SessionCheckResult, SessionService};
+use kanau::processor::Processor;
 use tonic::Status;
 use tonic::codegen::BoxFuture;
 use tonic::codegen::http::HeaderMap;
 use tower::Service;
 use uuid::Uuid;
-use wakuwaku::sqlx::DatabaseProcessor;
 
 #[derive(Clone)]
 pub struct AuthLayer {
@@ -74,5 +74,28 @@ async fn user_auth(
     metadata: &HeaderMap,
     service: &SessionService,
 ) -> Result<UserSessionInfo, Status> {
-    todo!()
+    let token = metadata
+        .get(SESSION_ID_HEADER)
+        .ok_or_else(|| Status::unauthenticated("missing session id header"))?
+        .to_str()
+        .map_err(|_| Status::unauthenticated("invalid session id header"))?
+        .to_owned();
+
+    let result = service
+        .process(SessionCheckRequest { token })
+        .await
+        .map_err(|err| Status::internal(err.to_string()))?;
+
+    match result {
+        SessionCheckResult::Invalid => {
+            Err(Status::unauthenticated("invalid or expired session"))
+        }
+        SessionCheckResult::Valid {
+            user_id,
+            session_id,
+        } => Ok(UserSessionInfo {
+            user_id,
+            session_id,
+        }),
+    }
 }
