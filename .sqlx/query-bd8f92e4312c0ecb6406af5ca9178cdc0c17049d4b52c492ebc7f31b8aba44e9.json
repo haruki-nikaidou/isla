@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE vault.config c\n            SET content = $1\n            WHERE c.scope = $2 AND c.config_name = $3\n            RETURNING c.content as \"content!\", c.id as \"id!\", c.\"scope\" as \"scope!\", c.config_name as \"config_name!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "content!",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "id!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "scope!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "config_name!",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Jsonb",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bd8f92e4312c0ecb6406af5ca9178cdc0c17049d4b52c492ebc7f31b8aba44e9"
+}
