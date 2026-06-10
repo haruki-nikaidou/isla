@@ -4,6 +4,7 @@ use crate::entities::db::session::{
 };
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
+use tracing::instrument;
 use uuid::Uuid;
 use vault::entities::db::config::FindConfig;
 use wakuwaku::error::Error;
@@ -28,6 +29,7 @@ pub enum SessionCheckResult {
 impl Processor<SessionCheckRequest> for SessionService {
     type Output = SessionCheckResult;
     type Error = Error;
+    #[instrument(skip_all, name = "SessionCheck", err)]
     async fn process(&self, input: SessionCheckRequest) -> Result<Self::Output, Self::Error> {
         let config_fut = self.db.process(FindConfig::<AuthModuleConfig>::new());
         let session_fut = self.db.process(FindSessionById {
@@ -60,6 +62,7 @@ pub struct ListSessionsOnUserRequest {
 impl Processor<ListSessionsOnUserRequest> for SessionService {
     type Output = Vec<SessionEntity>;
     type Error = Error;
+    #[instrument(skip_all, name = "ListSessionsOnUser", err, fields(user_id = %input.user_id))]
     async fn process(&self, input: ListSessionsOnUserRequest) -> Result<Self::Output, Self::Error> {
         let ListSessionsOnUserRequest { user_id } = input;
         let query_result = self.db.process(ListUserSessions { user_id }).await?;
@@ -84,6 +87,12 @@ pub enum TerminateSessionResult {
 impl Processor<TerminateSessionOnUserRequest> for SessionService {
     type Output = TerminateSessionResult;
     type Error = Error;
+    #[instrument(
+        skip_all,
+        name = "TerminateSessionOnUser",
+        err,
+        fields(user_id = %input.user_id, session_id = %input.session_id)
+    )]
     async fn process(
         &self,
         input: TerminateSessionOnUserRequest,

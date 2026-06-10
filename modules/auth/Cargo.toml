@@ -14,6 +14,7 @@ wakuwaku.workspace = true
 kanau.workspace = true
 redis.workspace = true
 tracing.workspace = true
+argon2.workspace = true
 tower.workspace = true
 tonic.workspace = true
 serde.workspace = true
