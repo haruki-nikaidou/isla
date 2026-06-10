@@ -1,5 +1,7 @@
 use crate::config::AuthModuleConfig;
-use crate::entities::db::session::{FindSessionById, TouchSession};
+use crate::entities::db::session::{
+    FindSessionById, ListUserSessions, SessionEntity, TerminateSession, TouchSession,
+};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use uuid::Uuid;
@@ -47,5 +49,66 @@ impl Processor<SessionCheckRequest> for SessionService {
             user_id: session_entity.user_id,
             session_id: session_entity.session_id,
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ListSessionsOnUserRequest {
+    pub user_id: Uuid,
+}
+
+impl Processor<ListSessionsOnUserRequest> for SessionService {
+    type Output = Vec<SessionEntity>;
+    type Error = Error;
+    async fn process(&self, input: ListSessionsOnUserRequest) -> Result<Self::Output, Self::Error> {
+        let ListSessionsOnUserRequest { user_id } = input;
+        let query_result = self.db.process(ListUserSessions { user_id }).await?;
+        Ok(query_result)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TerminateSessionOnUserRequest {
+    pub user_id: Uuid,
+    pub session_id: String,
+    pub current_session_id: String,
+}
+
+pub enum TerminateSessionResult {
+    Success,
+    NotFound,
+    /// The current session is terminated so the user must log in again.
+    ReLogin,
+}
+
+impl Processor<TerminateSessionOnUserRequest> for SessionService {
+    type Output = TerminateSessionResult;
+    type Error = Error;
+    async fn process(
+        &self,
+        input: TerminateSessionOnUserRequest,
+    ) -> Result<Self::Output, Self::Error> {
+        let to_terminate = self
+            .db
+            .process(FindSessionById {
+                session_id: input.current_session_id.clone(),
+            })
+            .await?;
+        if let Some(to_terminate) = to_terminate
+            && to_terminate.user_id == input.user_id
+        {
+            self.db
+                .process(TerminateSession {
+                    session_serial: to_terminate.serial,
+                })
+                .await?;
+            if to_terminate.session_id == input.current_session_id {
+                Ok(TerminateSessionResult::ReLogin)
+            } else {
+                Ok(TerminateSessionResult::NotFound)
+            }
+        } else {
+            Ok(TerminateSessionResult::NotFound)
+        }
     }
 }
