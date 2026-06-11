@@ -16,6 +16,12 @@ pub struct FindConfig<T: ModuleConfig> {
     _phantom: PhantomData<T>,
 }
 
+impl<T: ModuleConfig> Default for FindConfig<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: ModuleConfig> FindConfig<T> {
     pub fn new() -> Self {
         Self {

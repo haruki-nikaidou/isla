@@ -22,5 +22,5 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 pub mod entities;
-pub mod scopes;
 pub mod module_config;
+pub mod scopes;

@@ -1,7 +1,7 @@
 use crate::config::AuthModuleConfig;
 use crate::entities::db::accounts::FindUserByUsername;
-use crate::entities::db::session::{generate_session_id, CreateSession};
-use argon2::{PasswordHash, PasswordVerifier, Argon2};
+use crate::entities::db::session::{CreateSession, generate_session_id};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
@@ -22,9 +22,7 @@ pub struct LoginRequest {
 
 #[derive(Debug, Clone)]
 pub enum LoginResult {
-    Success {
-        session_token: String,
-    },
+    Success { session_token: String },
     InvalidCredentials,
 }
 

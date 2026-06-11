@@ -8,9 +8,9 @@
 //! System scopes (prefixed with `@isla`) are reserved for internal Isla
 //! services.
 
-use std::fmt::Display;
 use compact_str::CompactString;
 use smallvec::{SmallVec, smallvec};
+use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::LazyLock;
 

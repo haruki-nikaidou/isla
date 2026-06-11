@@ -14,13 +14,13 @@
 //!
 //! ## Submodules
 //!
-//! - [`entities`] — domain types (users, sessions, credentials, …).
-//! - [`services`] — business logic, transaction boundaries.
-//! - [`events`]   — AMQP event payloads emitted by this module.
-//! - [`hooks`]    — extension points consumed by other modules.
-//! - [`rpc`]      — gRPC service surface used by other modules and the
-//!                  dashboard.
-//! - [`config`]   — runtime configuration.
+//! - [`entities`] - domain types (users, sessions, credentials, …).
+//! - [`services`] - business logic, transaction boundaries.
+//! - [`events`]   - AMQP event payloads emitted by this module.
+//! - [`hooks`]    - extension points consumed by other modules.
+//! - [`rpc`]      - gRPC service surface used by other modules and the
+//!                dashboard.
+//! - [`config`]   - runtime configuration.
 //!
 //! ## Status
 //!

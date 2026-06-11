@@ -19,7 +19,7 @@ pub struct ListUserInvitesRequest {
 impl Processor<ListUserInvitesRequest> for InviteService {
     type Output = Vec<InvitationEntity>;
     type Error = wakuwaku::Error;
-    async fn process(&self, input: ListUserInvitesRequest) -> Result<Self::Output, Self::Error> {
+    async fn process(&self, _input: ListUserInvitesRequest) -> Result<Self::Output, Self::Error> {
         todo!()
     }
 }
@@ -32,7 +32,7 @@ pub struct CheckInviteTokenRequest {
 impl Processor<CheckInviteTokenRequest> for InviteService {
     type Output = Option<InvitationEntity>;
     type Error = wakuwaku::Error;
-    async fn process(&self, input: CheckInviteTokenRequest) -> Result<Self::Output, Self::Error> {
+    async fn process(&self, _input: CheckInviteTokenRequest) -> Result<Self::Output, Self::Error> {
         todo!()
     }
 }
@@ -55,7 +55,7 @@ pub enum UserRegisterResponse {
 impl Processor<UserRegisterRequest> for InviteService {
     type Output = UserRegisterResponse;
     type Error = wakuwaku::Error;
-    async fn process(&self, input: UserRegisterRequest) -> Result<Self::Output, Self::Error> {
+    async fn process(&self, _input: UserRegisterRequest) -> Result<Self::Output, Self::Error> {
         todo!()
     }
 }
@@ -70,7 +70,7 @@ pub struct CreateInviteRequest {
 impl Processor<CreateInviteRequest> for InviteService {
     type Output = InvitationEntity;
     type Error = wakuwaku::Error;
-    async fn process(&self, input: CreateInviteRequest) -> Result<Self::Output, Self::Error> {
+    async fn process(&self, _input: CreateInviteRequest) -> Result<Self::Output, Self::Error> {
         todo!()
     }
 }

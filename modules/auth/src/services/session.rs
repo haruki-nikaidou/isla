@@ -1,5 +1,9 @@
 use crate::config::AuthModuleConfig;
-use crate::entities::db::session::{FindSessionById, FindUserFromSession, ListUserSessions, SessionEntity, TerminateSession, TouchSession};
+use crate::entities::db::accounts::AccountRole;
+use crate::entities::db::session::{
+    FindSessionById, FindUserFromSession, ListUserSessions, SessionEntity, TerminateSession,
+    TouchSession,
+};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
@@ -7,7 +11,6 @@ use uuid::Uuid;
 use vault::entities::db::config::FindConfig;
 use wakuwaku::error::Error;
 use wakuwaku::sqlx::DatabaseProcessor;
-use crate::entities::db::accounts::AccountRole;
 
 #[derive(Debug, Clone)]
 pub struct SessionService {
@@ -22,7 +25,11 @@ pub struct SessionCheckRequest {
 #[derive(Debug, Clone)]
 pub enum SessionCheckResult {
     Invalid,
-    Valid { user_id: Uuid, session_id: String, role: AccountRole },
+    Valid {
+        user_id: Uuid,
+        session_id: String,
+        role: AccountRole,
+    },
 }
 
 impl Processor<SessionCheckRequest> for SessionService {
@@ -49,7 +56,7 @@ impl Processor<SessionCheckRequest> for SessionService {
         Ok(SessionCheckResult::Valid {
             user_id: session_entity.user_id,
             session_id: session_entity.session_id,
-            role: session_entity.user_role
+            role: session_entity.user_role,
         })
     }
 }

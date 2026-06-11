@@ -41,10 +41,12 @@ pub mod object_storage;
 /// rows default to [`PrivacyControlFlag::Protected`] at the database level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(type_name = "memory.privacy_control")]
+#[derive(Default)]
 pub enum PrivacyControlFlag {
     /// Visible only to the Master.
     Private,
     /// Visible to the Master and to known relationships (Dude, Acquaintance).
+    #[default]
     Protected,
     /// Visible to everyone, including strangers.
     Public,
@@ -63,11 +65,5 @@ impl PrivacyControlFlag {
             (Self::Protected, _) => false,
             (Self::Public, _) => true,
         }
-    }
-}
-
-impl Default for PrivacyControlFlag {
-    fn default() -> Self {
-        Self::Protected
     }
 }
