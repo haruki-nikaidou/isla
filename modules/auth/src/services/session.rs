@@ -1,7 +1,5 @@
 use crate::config::AuthModuleConfig;
-use crate::entities::db::session::{
-    FindSessionById, ListUserSessions, SessionEntity, TerminateSession, TouchSession,
-};
+use crate::entities::db::session::{FindSessionById, FindUserFromSession, ListUserSessions, SessionEntity, TerminateSession, TouchSession};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
@@ -9,6 +7,7 @@ use uuid::Uuid;
 use vault::entities::db::config::FindConfig;
 use wakuwaku::error::Error;
 use wakuwaku::sqlx::DatabaseProcessor;
+use crate::entities::db::accounts::AccountRole;
 
 #[derive(Debug, Clone)]
 pub struct SessionService {
@@ -23,7 +22,7 @@ pub struct SessionCheckRequest {
 #[derive(Debug, Clone)]
 pub enum SessionCheckResult {
     Invalid,
-    Valid { user_id: Uuid, session_id: String },
+    Valid { user_id: Uuid, session_id: String, role: AccountRole },
 }
 
 impl Processor<SessionCheckRequest> for SessionService {
@@ -32,7 +31,7 @@ impl Processor<SessionCheckRequest> for SessionService {
     #[instrument(skip_all, name = "SessionCheck", err)]
     async fn process(&self, input: SessionCheckRequest) -> Result<Self::Output, Self::Error> {
         let config_fut = self.db.process(FindConfig::<AuthModuleConfig>::new());
-        let session_fut = self.db.process(FindSessionById {
+        let session_fut = self.db.process(FindUserFromSession {
             session_id: input.token,
         });
         let (config, maybe_session_entity) = tokio::try_join!(config_fut, session_fut)?;
@@ -43,13 +42,14 @@ impl Processor<SessionCheckRequest> for SessionService {
         let new_expire = now + time::Duration::seconds(config.session.ttl as i64);
         self.db
             .process(TouchSession {
-                serial: session_entity.serial,
+                serial: session_entity.session_serial,
                 expires: PrimitiveDateTime::new(new_expire.date(), new_expire.time()),
             })
             .await?;
         Ok(SessionCheckResult::Valid {
             user_id: session_entity.user_id,
             session_id: session_entity.session_id,
+            role: session_entity.user_role
         })
     }
 }

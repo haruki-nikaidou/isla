@@ -1,3 +1,4 @@
+use crate::entities::db::accounts::AccountRole;
 use crate::services::session::{SessionCheckRequest, SessionCheckResult, SessionService};
 use kanau::processor::Processor;
 use tonic::Status;
@@ -68,6 +69,7 @@ pub const SESSION_ID_HEADER: &str = "x-session-id";
 pub struct UserSessionInfo {
     pub user_id: Uuid,
     pub session_id: String,
+    pub user_role: AccountRole,
 }
 
 async fn user_auth(
@@ -87,15 +89,15 @@ async fn user_auth(
         .map_err(|err| Status::internal(err.to_string()))?;
 
     match result {
-        SessionCheckResult::Invalid => {
-            Err(Status::unauthenticated("invalid or expired session"))
-        }
+        SessionCheckResult::Invalid => Err(Status::unauthenticated("invalid or expired session")),
         SessionCheckResult::Valid {
             user_id,
             session_id,
+            role,
         } => Ok(UserSessionInfo {
             user_id,
             session_id,
+            user_role: role,
         }),
     }
 }

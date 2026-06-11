@@ -1,3 +1,4 @@
+use crate::entities::db::accounts::AccountRole;
 use kanau::processor::Processor;
 use rand::distr::SampleString;
 use time::PrimitiveDateTime;
@@ -72,6 +73,42 @@ impl Processor<FindSessionById> for DatabaseProcessor {
             FROM auth.session
             WHERE session_id = $1
             LIMIT 1
+            "#,
+            input.session_id,
+        )
+        .fetch_optional(self.db())
+        .await
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FindUserFromSession {
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionWithUser {
+    pub session_serial: i64,
+    pub session_id: String,
+    pub user_id: Uuid,
+    pub user_role: AccountRole,
+}
+
+impl Processor<FindUserFromSession> for DatabaseProcessor {
+    type Output = Option<SessionWithUser>;
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:FindUserFromSession", err)]
+    async fn process(
+        &self,
+        input: FindUserFromSession,
+    ) -> Result<Option<SessionWithUser>, sqlx::Error> {
+        sqlx::query_as!(
+            SessionWithUser,
+            r#"
+            SELECT session_id, user_id, ac.role as "user_role: AccountRole", serial as "session_serial"
+            FROM auth.session s
+            INNER JOIN auth.account ac ON s.user_id = ac.id
+            WHERE session_id = $1 AND s.expires < NOW()
             "#,
             input.session_id,
         )

@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT session_id, user_id, ac.role as \"user_role: AccountRole\", serial as \"session_serial\"\n            FROM auth.session s\n            INNER JOIN auth.account ac ON s.user_id = ac.id\n            WHERE session_id = $1 AND s.expires < NOW()\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_role: AccountRole",
+        "type_info": {
+          "Custom": {
+            "name": "auth.account_status",
+            "kind": {
+              "Enum": [
+                "Owner",
+                "Member"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "session_serial",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0f111102e3c037356d1ef464321f5d3fcf1b6151afb4207c7ec049fac40b8dfc"
+}
