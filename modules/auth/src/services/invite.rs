@@ -1,12 +1,17 @@
-use crate::entities::db::invitation::InvitationEntity;
+use crate::entities::db::accounts::RegisterUserViaInvite;
+use crate::entities::db::invitation::{
+    CountInvitationUsedTimes, FindInvitationByToken, InvitationEntity, InvitationUsedTimes,
+};
+use crate::services::session::SessionService;
 use kanau::processor::Processor;
-use time::PrimitiveDateTime;
+use time::{OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 use wakuwaku::sqlx::DatabaseProcessor;
 
 #[derive(Debug, Clone)]
 pub struct InviteService {
     pub db: DatabaseProcessor,
+    pub session_service: SessionService,
 }
 
 #[derive(Debug, Clone)]
@@ -52,11 +57,61 @@ pub enum UserRegisterResponse {
     InvalidInvite,
 }
 
+fn check_invite(invite: &InvitationEntity, invite_used_count: InvitationUsedTimes) -> bool {
+    let now = OffsetDateTime::now_utc();
+    let now = PrimitiveDateTime::new(now.date(), now.time());
+    if now > invite.expire_at {
+        return false;
+    }
+    if let Some(use_limit) = invite_used_count.limit
+        && invite_used_count.current >= use_limit
+    {
+        return false;
+    }
+    true
+}
+
 impl Processor<UserRegisterRequest> for InviteService {
     type Output = UserRegisterResponse;
     type Error = wakuwaku::Error;
-    async fn process(&self, _input: UserRegisterRequest) -> Result<Self::Output, Self::Error> {
-        todo!()
+    async fn process(&self, input: UserRegisterRequest) -> Result<Self::Output, Self::Error> {
+        // find and check the invitation
+        let Some(invite_entity) = self
+            .db
+            .process(FindInvitationByToken {
+                token: input.use_invite,
+            })
+            .await?
+        else {
+            return Ok(UserRegisterResponse::InvalidInvite);
+        };
+        let inv_count = self
+            .db
+            .process(CountInvitationUsedTimes {
+                pk: invite_entity.token,
+            })
+            .await?;
+        if !check_invite(&invite_entity, inv_count) {
+            return Ok(UserRegisterResponse::InvalidInvite);
+        }
+
+        // register the user
+        let hashed_password = String::new();
+        let user = self
+            .db
+            .process(RegisterUserViaInvite {
+                username: input.username,
+                password_hash: hashed_password,
+                invite_token: input.use_invite,
+            })
+            .await?;
+
+        // login the user if needed
+        if input.register_with_login {
+            todo!()
+        } else {
+            Ok(UserRegisterResponse::Success)
+        }
     }
 }
 
