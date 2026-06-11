@@ -1,11 +1,8 @@
-use crate::config::AuthModuleConfig;
 use crate::entities::db::accounts::FindUserByUsername;
-use crate::entities::db::session::{CreateSession, generate_session_id};
+use crate::services::session::{CreateSessionRequest, SessionService};
 use crate::utils::password::verify_password;
 use kanau::processor::Processor;
-use time::PrimitiveDateTime;
 use tracing::instrument;
-use vault::entities::db::config::FindConfig;
 use wakuwaku::error::Error;
 use wakuwaku::sqlx::DatabaseProcessor;
 
@@ -32,12 +29,12 @@ impl Processor<LoginRequest> for LoginService {
 
     #[instrument(skip_all, name = "Login", err, fields(username = %input.username))]
     async fn process(&self, input: LoginRequest) -> Result<Self::Output, Self::Error> {
-        let account_fut = self.db.process(FindUserByUsername {
-            username: input.username,
-        });
-        let config_fut = self.db.process(FindConfig::<AuthModuleConfig>::new());
-
-        let (account, config) = tokio::try_join!(account_fut, config_fut)?;
+        let account = self
+            .db
+            .process(FindUserByUsername {
+                username: input.username,
+            })
+            .await?;
 
         let Some(account) = account else {
             return Ok(LoginResult::InvalidCredentials);
@@ -47,17 +44,12 @@ impl Processor<LoginRequest> for LoginService {
             return Ok(LoginResult::InvalidCredentials);
         }
 
-        let now = time::OffsetDateTime::now_utc();
-        let expires = now + time::Duration::seconds(config.session.ttl as i64);
-
-        let session_id = generate_session_id();
-
-        self.db
-            .process(CreateSession {
+        let session_service = SessionService {
+            db: self.db.clone(),
+        };
+        let session_id = session_service
+            .process(CreateSessionRequest {
                 user_id: account.id,
-                session_id: session_id.clone(),
-                created_at: PrimitiveDateTime::new(now.date(), now.time()),
-                expires: PrimitiveDateTime::new(expires.date(), expires.time()),
             })
             .await?;
 

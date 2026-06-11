@@ -1,8 +1,8 @@
 use crate::config::AuthModuleConfig;
 use crate::entities::db::accounts::AccountRole;
 use crate::entities::db::session::{
-    FindSessionById, FindUserFromSession, ListUserSessions, SessionEntity, TerminateSession,
-    TouchSession,
+    CreateSession, FindSessionById, FindUserFromSession, ListUserSessions, SessionEntity,
+    TerminateSession, TouchSession, generate_session_id,
 };
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
@@ -58,6 +58,36 @@ impl Processor<SessionCheckRequest> for SessionService {
             session_id: session_entity.session_id,
             role: session_entity.user_role,
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateSessionRequest {
+    pub user_id: Uuid,
+}
+
+impl Processor<CreateSessionRequest> for SessionService {
+    type Output = String;
+    type Error = Error;
+    #[instrument(skip_all, name = "CreateSession", err, fields(user_id = %input.user_id))]
+    async fn process(&self, input: CreateSessionRequest) -> Result<Self::Output, Self::Error> {
+        let config = self.db.process(FindConfig::<AuthModuleConfig>::new()).await?;
+
+        let now = time::OffsetDateTime::now_utc();
+        let expires = now + time::Duration::seconds(config.session.ttl as i64);
+
+        let session_id = generate_session_id();
+
+        self.db
+            .process(CreateSession {
+                user_id: input.user_id,
+                session_id: session_id.clone(),
+                created_at: PrimitiveDateTime::new(now.date(), now.time()),
+                expires: PrimitiveDateTime::new(expires.date(), expires.time()),
+            })
+            .await?;
+
+        Ok(session_id)
     }
 }
 

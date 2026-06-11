@@ -2,7 +2,7 @@ use crate::entities::db::accounts::RegisterUserViaInvite;
 use crate::entities::db::invitation::{
     CountInvitationUsedTimes, FindInvitationByToken, InvitationEntity, InvitationUsedTimes,
 };
-use crate::services::session::SessionService;
+use crate::services::session::{CreateSessionRequest, SessionService};
 use kanau::processor::Processor;
 use time::{OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
@@ -109,7 +109,11 @@ impl Processor<UserRegisterRequest> for InviteService {
 
         // login the user if needed
         if input.register_with_login {
-            todo!()
+            let token = self
+                .session_service
+                .process(CreateSessionRequest { user_id: user.id })
+                .await?;
+            Ok(UserRegisterResponse::Login { token })
         } else {
             Ok(UserRegisterResponse::Success)
         }
