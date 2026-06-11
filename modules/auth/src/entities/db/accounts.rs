@@ -22,6 +22,9 @@ pub struct AccountEntity {
 
     /// The time user registered. Readonly after creation.
     pub registered_at: PrimitiveDateTime,
+
+    /// The role assigned to this account.
+    pub role: AccountRole,
 }
 
 #[derive(Debug, Clone, sqlx::Type)]
@@ -46,7 +49,7 @@ impl Processor<FindAccountById> for DatabaseProcessor {
         sqlx::query_as!(
             AccountEntity,
             r#"
-            SELECT id, username, password, registered_at
+            SELECT id, username, password, registered_at, role AS "role: AccountRole"
             FROM auth.account
             WHERE id = $1
             LIMIT 1
@@ -75,7 +78,7 @@ impl Processor<FindUserByUsername> for DatabaseProcessor {
         sqlx::query_as!(
             AccountEntity,
             r#"
-            SELECT id, username, password, registered_at
+            SELECT id, username, password, registered_at, role AS "role: AccountRole"
             FROM auth.account
             WHERE username = $1
             LIMIT 1
@@ -101,7 +104,7 @@ impl Processor<ListAllUsers> for DatabaseProcessor {
         sqlx::query_as!(
             AccountEntity,
             r#"
-            SELECT id, username, password, registered_at
+            SELECT id, username, password, registered_at, role AS "role: AccountRole"
             FROM auth.account
             ORDER BY registered_at DESC
             LIMIT $1
@@ -119,6 +122,7 @@ impl Processor<ListAllUsers> for DatabaseProcessor {
 pub struct AddUserDirectly {
     pub username: String,
     pub password_hash: String,
+    pub role: AccountRole,
 }
 
 impl Processor<AddUserDirectly> for DatabaseProcessor {
@@ -130,12 +134,13 @@ impl Processor<AddUserDirectly> for DatabaseProcessor {
             AccountEntity,
             r#"
              INSERT INTO auth.account
-             (username, password)
-             VALUES ($1, $2)
-             RETURNING id, username, password, registered_at
+             (username, password, role)
+             VALUES ($1, $2, $3)
+             RETURNING id, username, password, registered_at, role AS "role: AccountRole"
              "#,
             input.username,
             input.password_hash,
+            input.role as AccountRole,
         )
         .fetch_one(self.db())
         .await
@@ -155,19 +160,6 @@ impl Processor<RegisterUserViaInvite> for DatabaseProcessor {
     #[instrument(skip_all, name = "SQL-Transaction:RegisterUserViaInvite", err)]
     async fn process(&self, input: RegisterUserViaInvite) -> Result<AccountEntity, sqlx::Error> {
         let mut tx = self.db().begin().await?;
-        let new_user = sqlx::query_as!(
-            AccountEntity,
-            r#"
-            INSERT INTO auth.account
-            (username, password)
-            VALUES ($1, $2)
-            RETURNING id, username, password, registered_at
-            "#,
-            input.username,
-            input.password_hash,
-        )
-        .fetch_one(&mut *tx)
-        .await?;
         let invite = sqlx::query_as!(
             InvitationEntity,
             r#"
@@ -177,6 +169,20 @@ impl Processor<RegisterUserViaInvite> for DatabaseProcessor {
             "#,
             input.invite_token,
         ).fetch_one(&mut *tx).await?;
+        let new_user = sqlx::query_as!(
+            AccountEntity,
+            r#"
+            INSERT INTO auth.account
+            (username, password, role)
+            VALUES ($1, $2, $3)
+            RETURNING id, username, password, registered_at, role AS "role: AccountRole"
+            "#,
+            input.username,
+            input.password_hash,
+            invite.role as AccountRole,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
         let _new_relationship = sqlx::query!(
             r#"
             INSERT INTO auth.invitation_relation

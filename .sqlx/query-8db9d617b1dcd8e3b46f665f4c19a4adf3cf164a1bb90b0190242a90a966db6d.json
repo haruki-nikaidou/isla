@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO auth.invitation_relation\n            (invite_via, invitee)\n            VALUES ($1, $2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8db9d617b1dcd8e3b46f665f4c19a4adf3cf164a1bb90b0190242a90a966db6d"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT id, username, password, registered_at\n            FROM auth.account\n            WHERE id = $1\n            LIMIT 1\n            ",
+  "query": "\n            SELECT id, username, password, registered_at, role AS \"role: AccountRole\"\n            FROM auth.account\n            WHERE id = $1\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -22,6 +22,21 @@
         "ordinal": 3,
         "name": "registered_at",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 4,
+        "name": "role: AccountRole",
+        "type_info": {
+          "Custom": {
+            "name": "auth.account_status",
+            "kind": {
+              "Enum": [
+                "Owner",
+                "Member"
+              ]
+            }
+          }
+        }
       }
     ],
     "parameters": {
@@ -33,8 +48,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "b9f0f35ab45e86b834255d2beb7ee90ee6bc639e8a07fa3c97d7addf2e6d0c2e"
+  "hash": "820b193f34082bc2e9fd308ebb9bc68ab9c62c2970af3034f9d9c2e79c827284"
 }
