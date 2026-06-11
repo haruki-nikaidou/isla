@@ -138,6 +138,7 @@ name = "auth"
 version = "0.1.0"
 dependencies = [
  "amqprs",
+ "anyhow",
  "argon2",
  "kanau",
  "rand 0.9.4",

@@ -1,7 +1,7 @@
 use crate::config::AuthModuleConfig;
 use crate::entities::db::accounts::FindUserByUsername;
 use crate::entities::db::session::{CreateSession, generate_session_id};
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use crate::utils::password::verify_password;
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
@@ -43,14 +43,7 @@ impl Processor<LoginRequest> for LoginService {
             return Ok(LoginResult::InvalidCredentials);
         };
 
-        let Ok(parsed_hash) = PasswordHash::new(&account.password) else {
-            return Ok(LoginResult::InvalidCredentials);
-        };
-
-        if Argon2::default()
-            .verify_password(input.password.as_bytes(), &parsed_hash)
-            .is_err()
-        {
+        if !verify_password(&input.password, &account.password) {
             return Ok(LoginResult::InvalidCredentials);
         }
 

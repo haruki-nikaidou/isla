@@ -96,7 +96,8 @@ impl Processor<UserRegisterRequest> for InviteService {
         }
 
         // register the user
-        let hashed_password = String::new();
+        let hashed_password = crate::utils::password::hash_password(&input.password_plaintext)
+            .map_err(|e| wakuwaku::Error::BusinessPanic(anyhow::anyhow!(e.to_string())))?;
         let user = self
             .db
             .process(RegisterUserViaInvite {
