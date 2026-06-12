@@ -147,6 +147,33 @@ impl Processor<AddUserDirectly> for DatabaseProcessor {
     }
 }
 
+/// Overwrite the stored password hash of an account.
+#[derive(Debug, Clone)]
+pub struct ChangePassword {
+    pub id: Uuid,
+    pub password_hash: String,
+}
+
+impl Processor<ChangePassword> for DatabaseProcessor {
+    type Output = ();
+    type Error = sqlx::Error;
+    #[instrument(skip_all, name = "SQL:ChangePassword", err, fields(id = %input.id))]
+    async fn process(&self, input: ChangePassword) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            UPDATE auth.account
+            SET password = $2
+            WHERE id = $1
+            "#,
+            input.id,
+            input.password_hash,
+        )
+        .execute(self.db())
+        .await?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RegisterUserViaInvite {
     pub username: String,

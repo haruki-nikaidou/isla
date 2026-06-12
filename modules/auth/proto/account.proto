@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package isla.auth.account;
+
+// Endpoints available to authenticated users to manage their own account:
+// their sessions, the invitations they have issued, and their password.
+//
+// Every call is authenticated through the session middleware, which resolves
+// the caller from the `x-session-id` header. Requests therefore do not carry
+// the caller identity explicitly.
+service Account {
+  // Terminate the session the request was made with.
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+  // List every active session belonging to the caller.
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // Terminate one of the caller's sessions, identified by its serial.
+  rpc TerminateSession(TerminateSessionRequest) returns (TerminateSessionResponse);
+
+  // Create a new invitation on behalf of the caller.
+  rpc SendInvite(SendInviteRequest) returns (SendInviteResponse);
+
+  // List the invitations the caller has issued.
+  rpc ListInvites(ListInvitesRequest) returns (ListInvitesResponse);
+
+  // Invalidate one of the caller's invitations so it can no longer be used.
+  rpc InvalidateInvite(InvalidateInviteRequest) returns (InvalidateInviteResponse);
+
+  // Change the caller's password. The current password must be supplied.
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+}
+
+// The role assigned to an account.
+enum AccountRole {
+  ACCOUNT_ROLE_UNSPECIFIED = 0;
+  ACCOUNT_ROLE_OWNER = 1;
+  ACCOUNT_ROLE_MEMBER = 2;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {
+  // Whether a session was terminated.
+  bool success = 1;
+}
+
+message ListSessionsRequest {}
+
+message SessionInfo {
+  // Self-incrementing serial used to address the session.
+  int64 serial = 1;
+  // Last time the session was refreshed, as an ISO-8601 timestamp.
+  string last_refreshed = 2;
+  // Expiry time, as an ISO-8601 timestamp.
+  string expires = 3;
+  // Whether this is the session the request was made with.
+  bool current = 4;
+}
+
+message ListSessionsResponse {
+  repeated SessionInfo sessions = 1;
+}
+
+message TerminateSessionRequest {
+  // The serial of the session to terminate.
+  int64 serial = 1;
+}
+
+message TerminateSessionResponse {
+  // Whether a matching session was found and terminated.
+  bool success = 1;
+}
+
+message SendInviteRequest {
+  // The role the invitee will receive after registration.
+  AccountRole role = 1;
+  // Number of seconds from now until the invitation expires.
+  int64 expire_in_seconds = 2;
+  // Maximum number of accounts that may use this invitation. Unset means
+  // unlimited.
+  optional int64 max_use_count = 3;
+}
+
+message SendInviteResponse {
+  // The invitation token, encoded as a UUID string.
+  string token = 1;
+}
+
+message ListInvitesRequest {
+  int64 limit = 1;
+  int64 offset = 2;
+}
+
+message InviteInfo {
+  // The invitation token, encoded as a UUID string.
+  string token = 1;
+  // Creation time, as an ISO-8601 timestamp.
+  string created_at = 2;
+  // Expiry time, as an ISO-8601 timestamp.
+  string expire_at = 3;
+  // Maximum number of accounts that may use this invitation. Unset means
+  // unlimited.
+  optional int64 max_accept_count = 4;
+  // The role the invitee will receive after registration.
+  AccountRole role = 5;
+}
+
+message ListInvitesResponse {
+  repeated InviteInfo invites = 1;
+}
+
+message InvalidateInviteRequest {
+  // The invitation token to invalidate, encoded as a UUID string.
+  string token = 1;
+}
+
+message InvalidateInviteResponse {
+  // Whether a matching invitation was found and invalidated.
+  bool success = 1;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse {
+  // Whether the password was changed. False when the current password did not
+  // match.
+  bool success = 1;
+}

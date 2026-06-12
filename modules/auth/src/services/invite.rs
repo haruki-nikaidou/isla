@@ -1,7 +1,7 @@
 use crate::entities::db::accounts::{AccountRole, FindAccountById, RegisterUserViaInvite};
 use crate::entities::db::invitation::{
-    CountInvitationUsedTimes, CreateInvitation, FindInvitationByToken, InvitationEntity,
-    InvitationUsedTimes,
+    CountInvitationUsedTimes, CreateInvitation, FindInvitationByToken, InvalidInvitation,
+    InvitationEntity, InvitationUsedTimes, ListInvitationsByUser,
 };
 use crate::services::session::{CreateSessionRequest, SessionService};
 use kanau::processor::Processor;
@@ -26,8 +26,58 @@ pub struct ListUserInvitesRequest {
 impl Processor<ListUserInvitesRequest> for InviteService {
     type Output = Vec<InvitationEntity>;
     type Error = wakuwaku::Error;
-    async fn process(&self, _input: ListUserInvitesRequest) -> Result<Self::Output, Self::Error> {
-        todo!()
+    #[instrument(skip_all, name = "ListUserInvites", err, fields(user_id = %input.user_id))]
+    async fn process(&self, input: ListUserInvitesRequest) -> Result<Self::Output, Self::Error> {
+        let ListUserInvitesRequest {
+            user_id,
+            offset,
+            limit,
+        } = input;
+        let invites = self
+            .db
+            .process(ListInvitationsByUser {
+                user_id,
+                limit,
+                offset,
+            })
+            .await?;
+        Ok(invites)
+    }
+}
+
+/// Invalidate an invitation issued by the requesting user so that it can no
+/// longer be used to register.
+#[derive(Debug, Clone, Copy)]
+pub struct InvalidateInviteRequest {
+    pub user_id: Uuid,
+    pub token: Uuid,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum InvalidateInviteResult {
+    Success,
+    NotFound,
+}
+
+impl Processor<InvalidateInviteRequest> for InviteService {
+    type Output = InvalidateInviteResult;
+    type Error = wakuwaku::Error;
+    #[instrument(skip_all, name = "InvalidateInvite", err, fields(user_id = %input.user_id, token = %input.token))]
+    async fn process(&self, input: InvalidateInviteRequest) -> Result<Self::Output, Self::Error> {
+        let Some(invite) = self
+            .db
+            .process(FindInvitationByToken { token: input.token })
+            .await?
+        else {
+            return Ok(InvalidateInviteResult::NotFound);
+        };
+        if invite.send_by != input.user_id {
+            return Ok(InvalidateInviteResult::NotFound);
+        }
+        self.db
+            .process(InvalidInvitation { pk: input.token })
+            .await?;
+        Ok(InvalidateInviteResult::Success)
     }
 }
 

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO auth.invitation (token, expire_at, max_accept_count, role, send_by)\n            VALUES ($1, $2, $3, $4, $5)\n            RETURNING\n                token,\n                created_at,\n                expire_at,\n                max_accept_count,\n                role AS \"role: AccountRole\",\n                send_by\n            ",
+  "query": "\n            INSERT INTO auth.invitation (token, expire_at, max_accept_count, role, send_by)\n            VALUES (gen_random_uuid(), $1, $2, $3, $4)\n            RETURNING\n                token,\n                created_at,\n                expire_at,\n                max_accept_count,\n                role AS \"role: AccountRole\",\n                send_by\n            ",
   "describe": {
     "columns": [
       {
@@ -46,7 +46,6 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Timestamp",
         "Int8",
         {
@@ -72,5 +71,5 @@
       false
     ]
   },
-  "hash": "b81987d64232b37ebcacc91d7e2cfdcc02cf136168e3ed07dfdde90f002f9fd9"
+  "hash": "a4807fd64b450f2e4ed9d40314c8d6e565d9a232e29e6533c0a87d82a6fd895f"
 }

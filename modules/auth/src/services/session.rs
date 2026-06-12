@@ -1,8 +1,8 @@
 use crate::config::AuthModuleConfig;
 use crate::entities::db::accounts::AccountRole;
 use crate::entities::db::session::{
-    CreateSession, FindSessionById, FindUserFromSession, ListUserSessions, SessionEntity,
-    TerminateSession, TouchSession, generate_session_id,
+    CreateSession, FindSessionById, FindSessionBySerial, FindUserFromSession, ListUserSessions,
+    SessionEntity, TerminateSession, TouchSession, generate_session_id,
 };
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
@@ -104,6 +104,79 @@ impl Processor<ListSessionsOnUserRequest> for SessionService {
         let ListSessionsOnUserRequest { user_id } = input;
         let query_result = self.db.process(ListUserSessions { user_id }).await?;
         Ok(query_result)
+    }
+}
+
+/// Terminate the session a request was made with, i.e. log the caller out.
+#[derive(Debug, Clone)]
+pub struct LogoutRequest {
+    pub session_id: String,
+}
+
+impl Processor<LogoutRequest> for SessionService {
+    /// `true` when a matching session existed and was terminated.
+    type Output = bool;
+    type Error = Error;
+    #[instrument(skip_all, name = "Logout", err)]
+    async fn process(&self, input: LogoutRequest) -> Result<Self::Output, Self::Error> {
+        let Some(session) = self
+            .db
+            .process(FindSessionById {
+                session_id: input.session_id,
+            })
+            .await?
+        else {
+            return Ok(false);
+        };
+        self.db
+            .process(TerminateSession {
+                session_serial: session.serial,
+            })
+            .await?;
+        Ok(true)
+    }
+}
+
+/// Terminate one of a user's sessions, addressed by its serial. The session
+/// must belong to the requesting user.
+#[derive(Debug, Clone)]
+pub struct TerminateUserSessionRequest {
+    pub user_id: Uuid,
+    pub serial: i64,
+}
+
+impl Processor<TerminateUserSessionRequest> for SessionService {
+    /// `true` when a matching session owned by the user was terminated.
+    type Output = bool;
+    type Error = Error;
+    #[instrument(
+        skip_all,
+        name = "TerminateUserSession",
+        err,
+        fields(user_id = %input.user_id, serial = input.serial)
+    )]
+    async fn process(
+        &self,
+        input: TerminateUserSessionRequest,
+    ) -> Result<Self::Output, Self::Error> {
+        let Some(session) = self
+            .db
+            .process(FindSessionBySerial {
+                serial: input.serial,
+            })
+            .await?
+        else {
+            return Ok(false);
+        };
+        if session.user_id != input.user_id {
+            return Ok(false);
+        }
+        self.db
+            .process(TerminateSession {
+                session_serial: session.serial,
+            })
+            .await?;
+        Ok(true)
     }
 }
 

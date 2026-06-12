@@ -9,3 +9,9 @@ pub mod preauth {
     #![allow(clippy::pedantic)]
     tonic::include_proto!("isla.auth.preauth");
 }
+
+pub mod account {
+    #![allow(clippy::all)]
+    #![allow(clippy::pedantic)]
+    tonic::include_proto!("isla.auth.account");
+}
