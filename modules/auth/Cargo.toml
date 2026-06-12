@@ -10,7 +10,7 @@ uuid.workspace = true
 sqlx.workspace = true
 time.workspace = true
 rand.workspace = true
-wakuwaku.workspace = true
+wakuwaku = { workspace = true, features = ["tonic"] }
 kanau.workspace = true
 redis.workspace = true
 tracing.workspace = true
@@ -18,7 +18,12 @@ argon2.workspace = true
 anyhow.workspace = true
 tower.workspace = true
 tonic.workspace = true
+tonic-prost.workspace = true
+prost.workspace = true
 serde.workspace = true
 sha2.workspace = true
 ring = "0.17"
 vault = {path = "../vault"}
+
+[build-dependencies]
+tonic-prost-build.workspace = true

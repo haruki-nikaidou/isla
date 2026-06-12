@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package isla.auth.preauth;
+
+// Endpoints available to users that are not yet authenticated, i.e. they have
+// not logged in or do not have an account.
+service Preauth {
+  // Authenticate an existing account with a username and password.
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Check whether an invitation token is still valid before registration.
+  rpc CheckInvite(CheckInviteRequest) returns (CheckInviteResponse);
+
+  // Register a new account using an invitation token.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+}
+
+// The role assigned to an account.
+enum AccountRole {
+  ACCOUNT_ROLE_UNSPECIFIED = 0;
+  ACCOUNT_ROLE_OWNER = 1;
+  ACCOUNT_ROLE_MEMBER = 2;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  // Whether the provided credentials were valid.
+  bool success = 1;
+  // The newly created session token. Only set when `success` is true.
+  optional string session_token = 2;
+}
+
+message CheckInviteRequest {
+  // The invitation token, encoded as a UUID string.
+  string token = 1;
+}
+
+message CheckInviteResponse {
+  // Whether the invitation token is valid and can still be used.
+  bool valid = 1;
+  // The role a user would receive when registering with this invitation.
+  // Only set when `valid` is true.
+  optional AccountRole role = 2;
+}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+  // The invitation token, encoded as a UUID string.
+  string invite_token = 3;
+  // Whether to immediately create a session for the new account.
+  bool login_after_register = 4;
+}
+
+// The outcome of a registration attempt.
+enum RegisterStatus {
+  REGISTER_STATUS_UNSPECIFIED = 0;
+  // The account was created. No session was requested.
+  REGISTER_STATUS_SUCCESS = 1;
+  // The account was created and a session was opened.
+  REGISTER_STATUS_LOGGED_IN = 2;
+  // The invitation token was missing, expired, or exhausted.
+  REGISTER_STATUS_INVALID_INVITE = 3;
+}
+
+message RegisterResponse {
+  RegisterStatus status = 1;
+  // The newly created session token. Only set when `status` is
+  // `REGISTER_STATUS_LOGGED_IN`.
+  optional string session_token = 2;
+}

@@ -5,6 +5,7 @@ use crate::entities::db::invitation::{
 use crate::services::session::{CreateSessionRequest, SessionService};
 use kanau::processor::Processor;
 use time::{OffsetDateTime, PrimitiveDateTime};
+use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::sqlx::DatabaseProcessor;
 
@@ -37,8 +38,26 @@ pub struct CheckInviteTokenRequest {
 impl Processor<CheckInviteTokenRequest> for InviteService {
     type Output = Option<InvitationEntity>;
     type Error = wakuwaku::Error;
-    async fn process(&self, _input: CheckInviteTokenRequest) -> Result<Self::Output, Self::Error> {
-        todo!()
+    #[instrument(skip_all, name = "CheckInviteToken", err, fields(token = %input.token))]
+    async fn process(&self, input: CheckInviteTokenRequest) -> Result<Self::Output, Self::Error> {
+        let Some(invite_entity) = self
+            .db
+            .process(FindInvitationByToken { token: input.token })
+            .await?
+        else {
+            return Ok(None);
+        };
+        let inv_count = self
+            .db
+            .process(CountInvitationUsedTimes {
+                pk: invite_entity.token,
+            })
+            .await?;
+        if check_invite(&invite_entity, inv_count) {
+            Ok(Some(invite_entity))
+        } else {
+            Ok(None)
+        }
     }
 }
 

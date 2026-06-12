@@ -33,6 +33,7 @@ pub mod config;
 pub mod entities;
 pub mod events;
 pub mod hooks;
+pub mod proto;
 pub mod rpc;
 pub mod services;
 mod utils;
