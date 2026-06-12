@@ -164,22 +164,22 @@ impl Processor<CountInvitationUsedTimes> for DatabaseProcessor {
 #[derive(Debug, Clone)]
 pub struct CreateInvitation {
     pub user_id: Uuid,
-    pub token: Uuid,
     pub expire_at: PrimitiveDateTime,
     pub max_accept_account: Option<i64>,
+    pub role: AccountRole,
 }
 
 impl Processor<CreateInvitation> for DatabaseProcessor {
     type Output = InvitationEntity;
     type Error = sqlx::Error;
 
-    #[instrument(skip_all, name = "SQL:CreateInvitation", err, fields(token = %input.token))]
+    #[instrument(skip_all, name = "SQL:CreateInvitation", err)]
     async fn process(&self, input: CreateInvitation) -> Result<Self::Output, Self::Error> {
         sqlx::query_as!(
             InvitationEntity,
             r#"
             INSERT INTO auth.invitation (token, expire_at, max_accept_count, role, send_by)
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES (gen_random_uuid(), $1, $2, $3, $4)
             RETURNING
                 token,
                 created_at,
@@ -188,10 +188,9 @@ impl Processor<CreateInvitation> for DatabaseProcessor {
                 role AS "role: AccountRole",
                 send_by
             "#,
-            input.token,
             input.expire_at,
             input.max_accept_account,
-            AccountRole::Member as AccountRole,
+            input.role as AccountRole,
             input.user_id,
         )
         .fetch_one(self.db())

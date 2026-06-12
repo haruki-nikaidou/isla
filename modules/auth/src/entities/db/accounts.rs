@@ -27,7 +27,7 @@ pub struct AccountEntity {
     pub role: AccountRole,
 }
 
-#[derive(Debug, Clone, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "auth.account_status")]
 pub enum AccountRole {
     Owner,

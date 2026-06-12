@@ -1,6 +1,7 @@
-use crate::entities::db::accounts::RegisterUserViaInvite;
+use crate::entities::db::accounts::{AccountRole, FindAccountById, RegisterUserViaInvite};
 use crate::entities::db::invitation::{
-    CountInvitationUsedTimes, FindInvitationByToken, InvitationEntity, InvitationUsedTimes,
+    CountInvitationUsedTimes, CreateInvitation, FindInvitationByToken, InvitationEntity,
+    InvitationUsedTimes,
 };
 use crate::services::session::{CreateSessionRequest, SessionService};
 use kanau::processor::Processor;
@@ -144,12 +145,38 @@ pub struct CreateInviteRequest {
     pub user_id: Uuid,
     pub expire_at: PrimitiveDateTime,
     pub max_use_count: Option<i64>,
+    /// The role assigned to the invitee after registration.
+    pub role: AccountRole,
 }
 
 impl Processor<CreateInviteRequest> for InviteService {
     type Output = InvitationEntity;
     type Error = wakuwaku::Error;
-    async fn process(&self, _input: CreateInviteRequest) -> Result<Self::Output, Self::Error> {
-        todo!()
+    #[instrument(skip_all, name = "CreateInvite", err, fields(user_id = %input.user_id))]
+    async fn process(&self, input: CreateInviteRequest) -> Result<Self::Output, Self::Error> {
+        // load the inviting account to determine its privileges
+        let account = self
+            .db
+            .process(FindAccountById {
+                id: input.user_id,
+            })
+            .await?
+            .ok_or(wakuwaku::Error::NotFound)?;
+
+        // a member cannot grant a role higher than its own; only an owner may
+        // create an invitation that makes the invitee an owner
+        if input.role == AccountRole::Owner && account.role != AccountRole::Owner {
+            return Err(wakuwaku::Error::PermissionsDenied);
+        }
+
+        self.db
+            .process(CreateInvitation {
+                user_id: input.user_id,
+                expire_at: input.expire_at,
+                max_accept_account: input.max_use_count,
+                role: input.role,
+            })
+            .await
+            .map_err(wakuwaku::Error::from)
     }
 }
