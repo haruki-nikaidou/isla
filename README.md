@@ -64,7 +64,7 @@ of contracts, messaging patterns, and observability tooling.
 
 | Traffic                        | Transport            | Payload |
 | ------------------------------ | -------------------- | ------- |
-| Intra-cluster module-to-module | RabbitM              | JSON    |
+| Intra-cluster module-to-module | RabbitMQ             | JSON    |
 | `webui` ↔ `interface` module   | gRPC                 | Protobuf |
 | `dashboard` ↔ most modules     | gRPC                 | Protobuf |
 | Plugin ↔ cluster               | RabbitMQ (AMQP)      | JSON    |
