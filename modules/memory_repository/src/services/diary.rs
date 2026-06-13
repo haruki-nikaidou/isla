@@ -3,8 +3,10 @@
 use kanau::processor::Processor;
 use time::Date;
 use tracing::instrument;
+use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     diary::{
@@ -12,10 +14,28 @@ use crate::entities::db::{
         UpdateDiary, UpdateDiaryPrivacy,
     },
 };
+use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DiaryService {
     pub database: DatabaseProcessor,
+    pub mq: AmqpPool,
+}
+
+impl DiaryService {
+    /// Publish an [`EntryUpserted`] for a diary so the RAG index (re)embeds it.
+    async fn publish_upsert(&self, id: i64) -> Result<(), Error> {
+        if let Some(d) = self.database.process(FindDiaryById { id }).await? {
+            EntryUpserted {
+                reference: EntryRef::diary(id),
+                privacy: d.privacy,
+                content: format!("{}\n{}\n{}", d.title, d.summary, d.content),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 /// Create a new diary entry for `date`. Fails if `title` is blank.
@@ -39,7 +59,7 @@ impl Processor<CreateDiaryRequest> for DiaryService {
         if input.title.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let id = self
             .database
             .process(CreateDiary {
                 title: input.title,
@@ -48,7 +68,9 @@ impl Processor<CreateDiaryRequest> for DiaryService {
                 content: input.content,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        self.publish_upsert(id).await?;
+        Ok(id)
     }
 }
 
@@ -108,7 +130,7 @@ impl Processor<UpdateDiaryRequest> for DiaryService {
         if input.title.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let updated = self
             .database
             .process(UpdateDiary {
                 id: input.id,
@@ -116,7 +138,11 @@ impl Processor<UpdateDiaryRequest> for DiaryService {
                 summary: input.summary,
                 content: input.content,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.publish_upsert(input.id).await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -133,13 +159,22 @@ impl Processor<UpdateDiaryPrivacyRequest> for DiaryService {
 
     #[instrument(skip_all, name = "UpdateDiaryPrivacyRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateDiaryPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateDiaryPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        if updated {
+            EntryPrivacyChanged {
+                reference: EntryRef::diary(input.id),
+                privacy: input.privacy,
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -155,7 +190,15 @@ impl Processor<DeleteDiaryRequest> for DiaryService {
 
     #[instrument(skip_all, name = "DeleteDiaryRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteDiaryRequest) -> Result<bool, Error> {
-        Ok(self.database.process(DeleteDiary { id: input.id }).await?)
+        let deleted = self.database.process(DeleteDiary { id: input.id }).await?;
+        if deleted {
+            EntryRemoved {
+                reference: EntryRef::diary(input.id),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(deleted)
     }
 }
 

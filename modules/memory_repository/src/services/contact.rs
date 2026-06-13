@@ -4,8 +4,10 @@ use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
 use uuid::Uuid;
+use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     contact::{
@@ -22,10 +24,33 @@ use crate::entities::db::{
         ListContactStoriesByIdentity, StoryType, UpdateContactStory, UpdateContactStoryPrivacy,
     },
 };
+use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ContactService {
     pub database: DatabaseProcessor,
+    pub mq: AmqpPool,
+}
+
+impl ContactService {
+    /// Publish an [`EntryUpserted`] for a contact identity so the RAG index
+    /// (re)embeds it.
+    async fn publish_identity_upsert(&self, id: Uuid) -> Result<(), Error> {
+        if let Some(i) = self
+            .database
+            .process(FindContactIdentityById { id })
+            .await?
+        {
+            EntryUpserted {
+                reference: EntryRef::contact(id),
+                privacy: i.privacy,
+                content: format!("{}\n{}", i.identify_name, i.description),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 // ─── Identity CRUD ────────────────────────────────────────────────────────────
@@ -58,6 +83,7 @@ impl Processor<CreateContactIdentityRequest> for ContactService {
                 privacy: input.privacy,
             })
             .await?;
+        self.publish_identity_upsert(id).await?;
         Ok(id)
     }
 }
@@ -101,14 +127,18 @@ impl Processor<UpdateContactIdentityRequest> for ContactService {
         if input.identify_name.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let updated = self
             .database
             .process(UpdateContactIdentity {
                 id: input.id,
                 identify_name: input.identify_name,
                 description: input.description,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.publish_identity_upsert(input.id).await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -148,13 +178,22 @@ impl Processor<UpdateContactIdentityPrivacyRequest> for ContactService {
 
     #[instrument(skip_all, name = "UpdateContactIdentityPrivacyRequest", err, fields(id = %input.id))]
     async fn process(&self, input: UpdateContactIdentityPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateContactIdentityPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        if updated {
+            EntryPrivacyChanged {
+                reference: EntryRef::contact(input.id),
+                privacy: input.privacy,
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -170,10 +209,18 @@ impl Processor<DeleteContactIdentityRequest> for ContactService {
 
     #[instrument(skip_all, name = "DeleteContactIdentityRequest", err, fields(id = %input.id))]
     async fn process(&self, input: DeleteContactIdentityRequest) -> Result<bool, Error> {
-        Ok(self
+        let deleted = self
             .database
             .process(DeleteContactIdentity { id: input.id })
-            .await?)
+            .await?;
+        if deleted {
+            EntryRemoved {
+                reference: EntryRef::contact(input.id),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(deleted)
     }
 }
 

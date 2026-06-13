@@ -8,13 +8,17 @@
 use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::Error;
-use wakuwaku::amqp::AmqpMessageProcessor;
+use wakuwaku::amqp::{AmqpMessageProcessor, AmqpMessageSend, AmqpPool};
 use wakuwaku::sqlx::DatabaseProcessor;
 
 use crate::entities::db::embedding::{DeleteEmbeddingByRef, UpdateEmbeddingPrivacyByRef};
-use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, SummaryNodesDirty};
+use crate::events::publish::{
+    EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended, SummaryNodesDirty,
+};
 use crate::services::embedding::{Embedder, EmbeddingService, IndexEntry};
-use crate::services::segment_tree::{RecomputeNode, SegmentTreeService, Summarizer};
+use crate::services::segment_tree::{
+    RecomputeNode, RecordMessage, SegmentTreeService, SemanticScorer, Summarizer,
+};
 
 /// Recomputes summary segment-tree nodes when an append finalizes them.
 #[derive(Debug, Clone)]
@@ -50,6 +54,55 @@ where
                     node,
                 })
                 .await?;
+        }
+        Ok(())
+    }
+}
+
+/// Scores an appended message, records its segment-tree metric, and emits
+/// [`SummaryNodesDirty`] for any nodes the append finalized — running the LLM
+/// scorer off the synchronous write path.
+#[derive(Clone)]
+pub struct MessageMetricHook<Sc, Su> {
+    pub service: SegmentTreeService<Sc, Su>,
+    pub mq: AmqpPool,
+}
+
+impl<Sc, Su> AmqpMessageProcessor<MessageAppended> for MessageMetricHook<Sc, Su>
+where
+    Sc: SemanticScorer + Send + Sync,
+    Su: Send + Sync,
+{
+    const QUEUE: &'static str = "memory_message_metric";
+}
+
+impl<Sc, Su> Processor<MessageAppended> for MessageMetricHook<Sc, Su>
+where
+    Sc: SemanticScorer + Send + Sync,
+    Su: Send + Sync,
+{
+    type Output = ();
+    type Error = Error;
+
+    #[instrument(skip_all, name = "MessageAppended", err,
+        fields(conversation_id = event.conversation_id, message_id = event.message_id))]
+    async fn process(&self, event: MessageAppended) -> Result<(), Error> {
+        let nodes = self
+            .service
+            .process(RecordMessage {
+                conversation_id: event.conversation_id,
+                message_id: event.message_id,
+                previous_excerpt: String::new(),
+                current_excerpt: event.current_excerpt,
+            })
+            .await?;
+        if !nodes.is_empty() {
+            SummaryNodesDirty {
+                conversation_id: event.conversation_id,
+                nodes,
+            }
+            .send(&self.mq)
+            .await?;
         }
         Ok(())
     }

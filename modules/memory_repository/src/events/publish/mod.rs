@@ -74,6 +74,26 @@ impl AmqpRouting for EntryRemoved {
 impl AmqpMessageSend for EntryRemoved {}
 json_message!(EntryRemoved);
 
+/// Emitted when a message is appended to a conversation. Consumed by
+/// `MessageMetricHook`, which scores the topical shift, records the metric, and
+/// emits [`SummaryNodesDirty`] for any nodes the append finalized. Keeps the
+/// LLM scorer out of the synchronous write path.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageAppended {
+    pub conversation_id: i64,
+    pub message_id: i64,
+    /// Text of the appended message, for scoring.
+    pub current_excerpt: String,
+}
+
+impl AmqpRouting for MessageAppended {
+    const EXCHANGE: &'static str = "memory.events";
+    const EXCHANGE_TYPE: AmqpExchangeType = AmqpExchangeType::Topic;
+    const ROUTING_KEY: &'static str = "conversation.message.appended";
+}
+impl AmqpMessageSend for MessageAppended {}
+json_message!(MessageAppended);
+
 /// Emitted when appending a message finalizes one or more summary segment-tree
 /// nodes that now need (re)summarizing.
 ///

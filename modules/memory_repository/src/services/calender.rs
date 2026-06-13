@@ -4,8 +4,10 @@ use kanau::processor::Processor;
 use time::{Date, OffsetDateTime, PrimitiveDateTime};
 use tracing::instrument;
 use uuid::Uuid;
+use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     calender::{
@@ -29,10 +31,29 @@ use crate::entities::db::{
         UpdateCalenderTask, UpdateCalenderTaskPrivacy, UpdateCalenderTaskStatus,
     },
 };
+use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CalenderService {
     pub database: DatabaseProcessor,
+    pub mq: AmqpPool,
+}
+
+impl CalenderService {
+    /// Publish an [`EntryUpserted`] for a calendar event so the RAG index
+    /// (re)embeds it.
+    async fn publish_event_upsert(&self, id: i64) -> Result<(), Error> {
+        if let Some(e) = self.database.process(FindCalenderEventById { id }).await? {
+            EntryUpserted {
+                reference: EntryRef::calender_event(id),
+                privacy: e.privacy,
+                content: format!("{}\n{}", e.title, e.description),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 // ─── Calendar CRUD ────────────────────────────────────────────────────────────
@@ -182,7 +203,7 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
         if input.title.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let id = self
             .database
             .process(CreateCalenderEvent {
                 calendar_id: input.calendar_id,
@@ -193,7 +214,9 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
                 repeat_until: input.repeat_until,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        self.publish_event_upsert(id).await?;
+        Ok(id)
     }
 }
 
@@ -239,7 +262,7 @@ impl Processor<UpdateCalenderEventRequest> for CalenderService {
         if input.title.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let updated = self
             .database
             .process(UpdateCalenderEvent {
                 id: input.id,
@@ -249,7 +272,11 @@ impl Processor<UpdateCalenderEventRequest> for CalenderService {
                 repeat: input.repeat,
                 repeat_until: input.repeat_until,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.publish_event_upsert(input.id).await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -265,10 +292,18 @@ impl Processor<DeleteCalenderEventRequest> for CalenderService {
 
     #[instrument(skip_all, name = "DeleteCalenderEventRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteCalenderEventRequest) -> Result<bool, Error> {
-        Ok(self
+        let deleted = self
             .database
             .process(DeleteCalenderEvent { id: input.id })
-            .await?)
+            .await?;
+        if deleted {
+            EntryRemoved {
+                reference: EntryRef::calender_event(input.id),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(deleted)
     }
 }
 
@@ -285,13 +320,22 @@ impl Processor<UpdateCalenderEventPrivacyRequest> for CalenderService {
 
     #[instrument(skip_all, name = "UpdateCalenderEventPrivacyRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateCalenderEventPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateCalenderEventPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        if updated {
+            EntryPrivacyChanged {
+                reference: EntryRef::calender_event(input.id),
+                privacy: input.privacy,
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(updated)
     }
 }
 

@@ -113,6 +113,33 @@ pub struct Summarize {
     pub parts: Vec<String>,
 }
 
+/// A network-free scorer for tests/wiring: scores by capping the new message's
+/// word count into `1..=25`.
+#[derive(Debug, Clone, Default)]
+pub struct MockScorer;
+
+impl Processor<ScoreMessage> for MockScorer {
+    type Output = i16;
+    type Error = Error;
+    async fn process(&self, input: ScoreMessage) -> Result<i16, Error> {
+        let words = input.current.split_whitespace().count();
+        Ok((words.clamp(1, 25)) as i16)
+    }
+}
+
+/// A network-free summarizer for tests/wiring: concatenates the parts. As the
+/// monoid identity, an empty input yields the empty summary.
+#[derive(Debug, Clone, Default)]
+pub struct MockSummarizer;
+
+impl Processor<Summarize> for MockSummarizer {
+    type Output = String;
+    type Error = Error;
+    async fn process(&self, input: Summarize) -> Result<String, Error> {
+        Ok(input.parts.join(" | "))
+    }
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 /// Maintains a conversation's summary segment tree.

@@ -2,8 +2,10 @@
 
 use kanau::processor::Processor;
 use tracing::instrument;
+use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     conversation::{
@@ -21,10 +23,33 @@ use crate::entities::db::{
         SetConversationMessageBranch,
     },
 };
+use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ConversationService {
     pub database: DatabaseProcessor,
+    pub mq: AmqpPool,
+}
+
+impl ConversationService {
+    /// Publish an [`EntryUpserted`] for a conversation so the RAG index
+    /// (re)embeds it from its summaries.
+    async fn publish_upsert(&self, id: i64) -> Result<(), Error> {
+        if let Some(c) = self.database.process(FindConversationById { id }).await? {
+            let content = match c.closing_summary {
+                Some(closing) => format!("{}\n{}", c.opening_summary, closing),
+                None => c.opening_summary,
+            };
+            EntryUpserted {
+                reference: EntryRef::conversation(id),
+                privacy: c.privacy,
+                content,
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 /// Returns the current Unix timestamp in seconds.
@@ -52,7 +77,7 @@ impl Processor<CreateConversationRequest> for ConversationService {
     #[instrument(skip_all, name = "CreateConversationRequest", err)]
     async fn process(&self, input: CreateConversationRequest) -> Result<i64, Error> {
         let ts = now_unix();
-        Ok(self
+        let id = self
             .database
             .process(CreateConversation {
                 opening_summary: input.opening_summary,
@@ -60,7 +85,9 @@ impl Processor<CreateConversationRequest> for ConversationService {
                 updated_at: ts,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        self.publish_upsert(id).await?;
+        Ok(id)
     }
 }
 
@@ -99,13 +126,17 @@ impl Processor<UpdateOpeningSummaryRequest> for ConversationService {
 
     #[instrument(skip_all, name = "UpdateOpeningSummaryRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateOpeningSummaryRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateConversationOpeningSummary {
                 id: input.id,
                 opening_summary: input.opening_summary,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.publish_upsert(input.id).await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -122,13 +153,22 @@ impl Processor<UpdateConversationPrivacyRequest> for ConversationService {
 
     #[instrument(skip_all, name = "UpdateConversationPrivacyRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateConversationPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateConversationPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        if updated {
+            EntryPrivacyChanged {
+                reference: EntryRef::conversation(input.id),
+                privacy: input.privacy,
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -145,14 +185,18 @@ impl Processor<CloseConversationRequest> for ConversationService {
 
     #[instrument(skip_all, name = "CloseConversationRequest", err, fields(id = input.id))]
     async fn process(&self, input: CloseConversationRequest) -> Result<bool, Error> {
-        Ok(self
+        let closed = self
             .database
             .process(CloseConversation {
                 id: input.id,
                 closing_summary: input.closing_summary,
                 updated_at: now_unix(),
             })
-            .await?)
+            .await?;
+        if closed {
+            self.publish_upsert(input.id).await?;
+        }
+        Ok(closed)
     }
 }
 
@@ -190,10 +234,18 @@ impl Processor<DeleteConversationRequest> for ConversationService {
 
     #[instrument(skip_all, name = "DeleteConversationRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteConversationRequest) -> Result<bool, Error> {
-        Ok(self
+        let deleted = self
             .database
             .process(DeleteConversation { id: input.id })
-            .await?)
+            .await?;
+        if deleted {
+            EntryRemoved {
+                reference: EntryRef::conversation(input.id),
+            }
+            .send(&self.mq)
+            .await?;
+        }
+        Ok(deleted)
     }
 }
 
@@ -245,16 +297,33 @@ impl Processor<AppendMessageRequest> for ConversationService {
     #[instrument(skip_all, name = "AppendMessageRequest", err,
         fields(conversation_id = input.conversation_id))]
     async fn process(&self, input: AppendMessageRequest) -> Result<i64, Error> {
-        Ok(self
+        // Excerpt the new message's text up front so the segment-tree scorer
+        // (run async by a hook) needn't reload it.
+        let excerpt: String = input
+            .contents
+            .iter()
+            .filter_map(|c| c.text.as_deref())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let conversation_id = input.conversation_id;
+        let message_id = self
             .database
             .process(AppendMessageTx {
-                conversation_id: input.conversation_id,
+                conversation_id,
                 before: input.before,
                 role: input.role,
                 contents: input.contents,
                 conversation_updated_at: now_unix(),
             })
-            .await?)
+            .await?;
+        MessageAppended {
+            conversation_id,
+            message_id,
+            current_excerpt: excerpt,
+        }
+        .send(&self.mq)
+        .await?;
+        Ok(message_id)
     }
 }
 
