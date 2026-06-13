@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Update the inherited privacy of the embedding row for a source entry,\n-- identified by its product-of-nullable-FK reference.\nUPDATE memory.embedding\nSET privacy = $5\nWHERE calender_event IS NOT DISTINCT FROM $1\n  AND conversation   IS NOT DISTINCT FROM $2\n  AND contact        IS NOT DISTINCT FROM $3\n  AND diary          IS NOT DISTINCT FROM $4\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Uuid",
+        "Int8",
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "43753668662c356d4aed2767f9fd830ab3e1ee88e66901636849f79272d66093"
+}

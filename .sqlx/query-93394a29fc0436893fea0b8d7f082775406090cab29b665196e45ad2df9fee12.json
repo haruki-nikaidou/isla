@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Delete the embedding row for a source entry, identified by its\n-- product-of-nullable-FK reference.\nDELETE FROM memory.embedding\nWHERE calender_event IS NOT DISTINCT FROM $1\n  AND conversation   IS NOT DISTINCT FROM $2\n  AND contact        IS NOT DISTINCT FROM $3\n  AND diary          IS NOT DISTINCT FROM $4\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "93394a29fc0436893fea0b8d7f082775406090cab29b665196e45ad2df9fee12"
+}

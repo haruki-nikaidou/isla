@@ -12,7 +12,11 @@ wakuwaku.workspace = true
 kanau.workspace = true
 rkyv.workspace = true
 redis.workspace = true
+pgvector.workspace = true
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

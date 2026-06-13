@@ -7,6 +7,7 @@ pub mod calender;
 pub mod contact;
 pub mod conversation;
 pub mod diary;
+pub mod embedding;
 pub mod manage;
 pub mod personality;
 pub mod segment_tree;

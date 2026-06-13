@@ -23,6 +23,7 @@ pub mod conversation_message;
 pub mod conversation_message_metric;
 pub mod conversation_summary_node;
 pub mod diary;
+pub mod embedding;
 pub mod object_storage;
 pub mod personality;
 
@@ -45,7 +46,7 @@ pub mod personality;
 /// rows default to [`PrivacyControlFlag::Protected`] at the database level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(type_name = "memory.privacy_control")]
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub enum PrivacyControlFlag {
     /// Visible only to the Master.
     Private,
