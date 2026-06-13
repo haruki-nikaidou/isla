@@ -8,4 +8,7 @@ pub mod contact;
 pub mod conversation;
 pub mod diary;
 pub mod manage;
+pub mod personality;
+pub mod segment_tree;
 pub mod storage;
+pub mod summary;

@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, conversation_id, level, bucket, covers_from_message_id,\n                   covers_to_message_id, distance_from, distance_to, summary,\n                   is_open, updated_at\n            FROM memory.conversation_summary_node\n            WHERE conversation_id = $1\n            ORDER BY level DESC, bucket ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "conversation_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "level",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "bucket",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "covers_from_message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "covers_to_message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "distance_from",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "distance_to",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "summary",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "is_open",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "76b3eca11caa6bca4f45df5fc4acf481bbcce5d5bfc17b4891a22cabcbe99dc1"
+}

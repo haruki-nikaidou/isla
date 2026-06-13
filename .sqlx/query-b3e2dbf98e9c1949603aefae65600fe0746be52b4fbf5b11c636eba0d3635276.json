@@ -1,0 +1,85 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- The children of a segment-tree node: the level-($2 - 1) nodes whose\n-- cumulative-distance span falls inside the parent's [$3, $4) range. These are\n-- combined (the summary monoid) to produce the parent's summary.\nSELECT\n    id,\n    conversation_id,\n    level,\n    bucket,\n    covers_from_message_id,\n    covers_to_message_id,\n    distance_from,\n    distance_to,\n    summary,\n    is_open,\n    updated_at\nFROM memory.conversation_summary_node\nWHERE conversation_id = $1\n  AND level = $2 - 1\n  AND distance_from >= $3\n  AND distance_to   <= $4\nORDER BY bucket ASC\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "conversation_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "level",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "bucket",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "covers_from_message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "covers_to_message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "distance_from",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "distance_to",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "summary",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "is_open",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b3e2dbf98e9c1949603aefae65600fe0746be52b4fbf5b11c636eba0d3635276"
+}

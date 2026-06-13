@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- The raw text of the messages whose cumulative semantic distance falls in\n-- [$2, $3) for a conversation. These are the leaves combined to summarize a\n-- level-1 segment-tree node. Non-text content blocks are ignored here.\nSELECT\n    cm.id AS \"message_id!\",\n    COALESCE(string_agg(cc.text, ' ' ORDER BY cc.position), '') AS \"text!\"\nFROM memory.conversation_message cm\nJOIN memory.conversation_message_metric m ON m.message_id = cm.id\nLEFT JOIN memory.conversation_content cc\n       ON cc.message_id = cm.id AND cc.modality = 'Text'\nWHERE cm.conversation_id = $1\n  AND m.cumulative_distance >= $2\n  AND m.cumulative_distance < $3\nGROUP BY cm.id\nORDER BY cm.id ASC\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "text!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "d2aa710478c7dbd69888a3fd2a652d5da58bb7a3a4e4a0290c5d146d907964d1"
+}

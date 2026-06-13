@@ -7,6 +7,7 @@
 //! - **Calendar**: [`calender`], [`calender_event`], [`calender_daily_event`], [`calender_task`] — scheduling
 //! - **Contacts**: [`contact`], [`contact_identity`], [`contact_stories`] — relationship tracking
 //! - **Diary**: [`diary`] — daily journal entries
+//! - **Personality**: [`personality`] — character facets surfaced into the system prompt
 
 pub mod bucket;
 pub mod calender;
@@ -19,8 +20,11 @@ pub mod contact_stories;
 pub mod conversation;
 pub mod conversation_content;
 pub mod conversation_message;
+pub mod conversation_message_metric;
+pub mod conversation_summary_node;
 pub mod diary;
 pub mod object_storage;
+pub mod personality;
 
 /// Audience-based visibility flag for stored memory entities.
 ///
