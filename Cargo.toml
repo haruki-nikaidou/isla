@@ -8,6 +8,7 @@ members = [
     "modules/auth",
     "modules/interface",
     "modules/memory_repository",
+    "modules/personality",
     "modules/plugin_registrar",
     "modules/shield",
     "modules/vault",

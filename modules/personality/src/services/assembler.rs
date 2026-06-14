@@ -11,7 +11,7 @@ use memory_repository::entities::db::contact_identity::Relationship;
 use tracing::instrument;
 use wakuwaku::Error;
 
-use crate::model::{GenerationParams, LlmMessage, LlmRequest, SystemBlock, ToolSpec};
+use ai_caller::model::{GenerationParams, LlmMessage, LlmRequest, SystemBlock, ToolSpec};
 
 /// The conversational context that decides which personality facets and which
 /// memories are in scope for a turn.
@@ -134,7 +134,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ContentBlock, Role};
+    use ai_caller::model::{ContentBlock, Role};
 
     /// Mock personality source: Master also gets an intimate facet, others
     /// only the shared core — modelling "different behavior per audience".

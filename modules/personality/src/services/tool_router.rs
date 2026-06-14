@@ -18,7 +18,7 @@ use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::Error;
 
-use crate::model::{ContentBlock, ToolCall};
+use ai_caller::model::{ContentBlock, ToolCall};
 
 /// Something that can execute a [`ToolCall`] and return its JSON output.
 ///

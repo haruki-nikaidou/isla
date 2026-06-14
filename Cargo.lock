@@ -36,7 +36,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "kanau",
- "memory_repository",
  "serde",
  "serde_json",
  "tokio",
@@ -1572,6 +1571,22 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "personality"
+version = "0.1.0"
+dependencies = [
+ "ai_caller",
+ "anyhow",
+ "kanau",
+ "memory_repository",
+ "plugin_registrar",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "wakuwaku",
+]
 
 [[package]]
 name = "petgraph"

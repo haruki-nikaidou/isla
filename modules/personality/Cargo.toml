@@ -1,5 +1,5 @@
 [package]
-name = "ai_caller"
+name = "personality"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,8 +9,10 @@ kanau.workspace = true
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-uuid.workspace = true
 anyhow.workspace = true
+ai_caller = { path = "../ai_caller" }
+memory_repository = { path = "../memory_repository" }
+plugin_registrar = { path = "../plugin_registrar" }
 
 [dev-dependencies]
 tokio.workspace = true

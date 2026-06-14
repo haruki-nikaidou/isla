@@ -8,7 +8,7 @@ use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::Error;
 
-use crate::model::{ContentBlock, LlmMessage, LlmRequest, LlmResponse, Role, StopReason, ToolCall};
+use ai_caller::model::{ContentBlock, LlmMessage, LlmRequest, LlmResponse, Role, StopReason, ToolCall};
 
 /// Upper bound on provider round-trips in a single turn, so a model that keeps
 /// asking for tools can never loop forever. Defensive by design.
@@ -105,8 +105,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{GenerationParams, ToolSpec};
-    use crate::services::provider::MockProvider;
+    use ai_caller::model::{GenerationParams, ToolSpec};
+    use ai_caller::services::provider::MockProvider;
     use crate::services::tool_router::ToolRouterService;
     use crate::services::tool_router::mock::MockToolHandler;
     use serde_json::json;

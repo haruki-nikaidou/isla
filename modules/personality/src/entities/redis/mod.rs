@@ -11,7 +11,7 @@ use memory_repository::entities::db::contact_identity::Relationship;
 use serde::{Deserialize, Serialize};
 use wakuwaku::redis::{KeyValue, KeyValueRead, KeyValueWrite, RedisKey};
 
-use crate::model::SystemBlock;
+use ai_caller::model::SystemBlock;
 
 /// The cached, fully-assembled system prompt for one audience.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonMessageSer, JsonMessageDe)]
