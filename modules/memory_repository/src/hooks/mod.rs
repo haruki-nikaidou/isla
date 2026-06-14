@@ -15,9 +15,7 @@ use wakuwaku::amqp::AmqpMessageProcessor;
 use wakuwaku::sqlx::DatabaseProcessor;
 
 use crate::entities::db::embedding::{DeleteEmbeddingByRef, UpdateEmbeddingPrivacyByRef};
-use crate::events::publish::{
-    EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended,
-};
+use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended};
 use crate::services::embedding::{Embedder, EmbeddingService, IndexEntry};
 use crate::services::segment_tree::{RecordMessage, SegmentTreeService, SemanticScorer};
 

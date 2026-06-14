@@ -1,8 +1,9 @@
 //! Conversation service — lifecycle management, message appending, and content retrieval.
 
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use tracing::instrument;
-use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
+use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -29,6 +30,7 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, M
 pub struct ConversationService {
     pub database: DatabaseProcessor,
     pub mq: AmqpPool,
+    pub redis: RedisPool,
 }
 
 impl ConversationService {
@@ -40,12 +42,15 @@ impl ConversationService {
                 Some(closing) => format!("{}\n{}", c.opening_summary, closing),
                 None => c.opening_summary,
             };
-            EntryUpserted {
-                reference: EntryRef::conversation(id),
-                privacy: c.privacy,
-                content,
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryUpserted {
+                    reference: EntryRef::conversation(id),
+                    privacy: c.privacy,
+                    content,
+                },
+            )
             .await?;
         }
         Ok(())
@@ -161,11 +166,14 @@ impl Processor<UpdateConversationPrivacyRequest> for ConversationService {
             })
             .await?;
         if updated {
-            EntryPrivacyChanged {
-                reference: EntryRef::conversation(input.id),
-                privacy: input.privacy,
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryPrivacyChanged {
+                    reference: EntryRef::conversation(input.id),
+                    privacy: input.privacy,
+                },
+            )
             .await?;
         }
         Ok(updated)
@@ -239,10 +247,13 @@ impl Processor<DeleteConversationRequest> for ConversationService {
             .process(DeleteConversation { id: input.id })
             .await?;
         if deleted {
-            EntryRemoved {
-                reference: EntryRef::conversation(input.id),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryRemoved {
+                    reference: EntryRef::conversation(input.id),
+                },
+            )
             .await?;
         }
         Ok(deleted)
@@ -316,12 +327,15 @@ impl Processor<AppendMessageRequest> for ConversationService {
                 conversation_updated_at: now_unix(),
             })
             .await?;
-        MessageAppended {
-            conversation_id,
-            message_id,
-            current_excerpt: excerpt,
-        }
-        .send(&self.mq)
+        ContextRef::publish(
+            &self.redis,
+            &self.mq,
+            MessageAppended {
+                conversation_id,
+                message_id,
+                current_excerpt: excerpt,
+            },
+        )
         .await?;
         Ok(message_id)
     }

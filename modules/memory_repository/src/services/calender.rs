@@ -1,10 +1,11 @@
 //! Calendar service — CRUD for calendars, events, all-day events, tasks, and task dependencies.
 
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::{Date, OffsetDateTime, PrimitiveDateTime};
 use tracing::instrument;
 use uuid::Uuid;
-use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
+use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -37,6 +38,7 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 pub struct CalenderService {
     pub database: DatabaseProcessor,
     pub mq: AmqpPool,
+    pub redis: RedisPool,
 }
 
 impl CalenderService {
@@ -44,12 +46,15 @@ impl CalenderService {
     /// (re)embeds it.
     async fn publish_event_upsert(&self, id: i64) -> Result<(), Error> {
         if let Some(e) = self.database.process(FindCalenderEventById { id }).await? {
-            EntryUpserted {
-                reference: EntryRef::calender_event(id),
-                privacy: e.privacy,
-                content: format!("{}\n{}", e.title, e.description),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryUpserted {
+                    reference: EntryRef::calender_event(id),
+                    privacy: e.privacy,
+                    content: format!("{}\n{}", e.title, e.description),
+                },
+            )
             .await?;
         }
         Ok(())
@@ -297,10 +302,13 @@ impl Processor<DeleteCalenderEventRequest> for CalenderService {
             .process(DeleteCalenderEvent { id: input.id })
             .await?;
         if deleted {
-            EntryRemoved {
-                reference: EntryRef::calender_event(input.id),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryRemoved {
+                    reference: EntryRef::calender_event(input.id),
+                },
+            )
             .await?;
         }
         Ok(deleted)
@@ -328,11 +336,14 @@ impl Processor<UpdateCalenderEventPrivacyRequest> for CalenderService {
             })
             .await?;
         if updated {
-            EntryPrivacyChanged {
-                reference: EntryRef::calender_event(input.id),
-                privacy: input.privacy,
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryPrivacyChanged {
+                    reference: EntryRef::calender_event(input.id),
+                    privacy: input.privacy,
+                },
+            )
             .await?;
         }
         Ok(updated)

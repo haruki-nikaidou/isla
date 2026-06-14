@@ -1391,6 +1391,7 @@ name = "memory_repository"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dynamic_message_extension",
  "kanau",
  "pgvector",
  "rand 0.9.4",

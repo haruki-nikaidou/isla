@@ -1,9 +1,10 @@
 //! Diary service — CRUD for daily journal entries.
 
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::Date;
 use tracing::instrument;
-use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
+use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -20,18 +21,22 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 pub struct DiaryService {
     pub database: DatabaseProcessor,
     pub mq: AmqpPool,
+    pub redis: RedisPool,
 }
 
 impl DiaryService {
     /// Publish an [`EntryUpserted`] for a diary so the RAG index (re)embeds it.
     async fn publish_upsert(&self, id: i64) -> Result<(), Error> {
         if let Some(d) = self.database.process(FindDiaryById { id }).await? {
-            EntryUpserted {
-                reference: EntryRef::diary(id),
-                privacy: d.privacy,
-                content: format!("{}\n{}\n{}", d.title, d.summary, d.content),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryUpserted {
+                    reference: EntryRef::diary(id),
+                    privacy: d.privacy,
+                    content: format!("{}\n{}\n{}", d.title, d.summary, d.content),
+                },
+            )
             .await?;
         }
         Ok(())
@@ -167,11 +172,14 @@ impl Processor<UpdateDiaryPrivacyRequest> for DiaryService {
             })
             .await?;
         if updated {
-            EntryPrivacyChanged {
-                reference: EntryRef::diary(input.id),
-                privacy: input.privacy,
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryPrivacyChanged {
+                    reference: EntryRef::diary(input.id),
+                    privacy: input.privacy,
+                },
+            )
             .await?;
         }
         Ok(updated)
@@ -192,10 +200,13 @@ impl Processor<DeleteDiaryRequest> for DiaryService {
     async fn process(&self, input: DeleteDiaryRequest) -> Result<bool, Error> {
         let deleted = self.database.process(DeleteDiary { id: input.id }).await?;
         if deleted {
-            EntryRemoved {
-                reference: EntryRef::diary(input.id),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryRemoved {
+                    reference: EntryRef::diary(input.id),
+                },
+            )
             .await?;
         }
         Ok(deleted)

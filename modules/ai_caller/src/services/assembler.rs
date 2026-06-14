@@ -27,11 +27,9 @@ pub struct Environment {
 /// Seam: source of personality facet text applicable to a peer, pre-ordered.
 ///
 /// Backed by `memory_repository::services::personality::PersonalityService`.
-pub trait PersonalitySource:
-    Processor<FacetRequest, Output = Vec<String>, Error = Error>
-{
-}
-impl<T> PersonalitySource for T where T: Processor<FacetRequest, Output = Vec<String>, Error = Error> {}
+pub trait PersonalitySource: Processor<FacetRequest, Output = Vec<String>, Error = Error> {}
+impl<T> PersonalitySource for T where T: Processor<FacetRequest, Output = Vec<String>, Error = Error>
+{}
 
 /// Request for the personality facets applicable to a peer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,8 +44,10 @@ pub trait HistorySource:
     Processor<HistoryRequest, Output = Vec<LlmMessage>, Error = Error>
 {
 }
-impl<T> HistorySource for T where T: Processor<HistoryRequest, Output = Vec<LlmMessage>, Error = Error>
-{}
+impl<T> HistorySource for T where
+    T: Processor<HistoryRequest, Output = Vec<LlmMessage>, Error = Error>
+{
+}
 
 /// Request for the most recent messages of a conversation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,9 +59,14 @@ pub struct HistoryRequest {
 /// Seam: source of the tools the model may call this turn.
 ///
 /// Backed by `plugin_registrar` plus the internal interface tools.
-pub trait ToolCatalog: Processor<ToolCatalogRequest, Output = Vec<ToolSpec>, Error = Error> {}
-impl<T> ToolCatalog for T where T: Processor<ToolCatalogRequest, Output = Vec<ToolSpec>, Error = Error>
-{}
+pub trait ToolCatalog:
+    Processor<ToolCatalogRequest, Output = Vec<ToolSpec>, Error = Error>
+{
+}
+impl<T> ToolCatalog for T where
+    T: Processor<ToolCatalogRequest, Output = Vec<ToolSpec>, Error = Error>
+{
+}
 
 /// Request for the available tool catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

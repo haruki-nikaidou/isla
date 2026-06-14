@@ -1,10 +1,11 @@
 //! Contact service — identities, platform contacts, and relationship stories.
 
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
 use uuid::Uuid;
-use wakuwaku::amqp::{AmqpMessageSend, AmqpPool};
+use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -30,6 +31,7 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 pub struct ContactService {
     pub database: DatabaseProcessor,
     pub mq: AmqpPool,
+    pub redis: RedisPool,
 }
 
 impl ContactService {
@@ -41,12 +43,15 @@ impl ContactService {
             .process(FindContactIdentityById { id })
             .await?
         {
-            EntryUpserted {
-                reference: EntryRef::contact(id),
-                privacy: i.privacy,
-                content: format!("{}\n{}", i.identify_name, i.description),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryUpserted {
+                    reference: EntryRef::contact(id),
+                    privacy: i.privacy,
+                    content: format!("{}\n{}", i.identify_name, i.description),
+                },
+            )
             .await?;
         }
         Ok(())
@@ -186,11 +191,14 @@ impl Processor<UpdateContactIdentityPrivacyRequest> for ContactService {
             })
             .await?;
         if updated {
-            EntryPrivacyChanged {
-                reference: EntryRef::contact(input.id),
-                privacy: input.privacy,
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryPrivacyChanged {
+                    reference: EntryRef::contact(input.id),
+                    privacy: input.privacy,
+                },
+            )
             .await?;
         }
         Ok(updated)
@@ -214,10 +222,13 @@ impl Processor<DeleteContactIdentityRequest> for ContactService {
             .process(DeleteContactIdentity { id: input.id })
             .await?;
         if deleted {
-            EntryRemoved {
-                reference: EntryRef::contact(input.id),
-            }
-            .send(&self.mq)
+            ContextRef::publish(
+                &self.redis,
+                &self.mq,
+                EntryRemoved {
+                    reference: EntryRef::contact(input.id),
+                },
+            )
             .await?;
         }
         Ok(deleted)

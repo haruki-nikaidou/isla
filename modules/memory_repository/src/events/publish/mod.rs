@@ -1,4 +1,11 @@
 //! AMQP events published by `memory_repository`.
+//!
+//! These structs are the event *bodies*; they are not sent inline. Producers
+//! park each body in the Redis context store and publish only a
+//! [`ContextRef`](dynamic_message_extension::dynamic_context::ContextRef)
+//! pointer onto the bus, so an oversized field (a summary, an excerpt) never
+//! rides on AMQP. A consumer recovers the body by wrapping its processor in
+//! [`ContextRefWrap`](dynamic_message_extension::dynamic_context::ContextRefWrap).
 
 use kanau::message::{MessageDe, MessageSer};
 use serde::{Deserialize, Serialize};

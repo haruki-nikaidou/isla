@@ -207,7 +207,10 @@ impl Processor<MessagesInDistanceRange> for DatabaseProcessor {
 
     #[instrument(skip_all, name = "SQL:MessagesInDistanceRange", err,
         fields(conversation_id = input.conversation_id))]
-    async fn process(&self, input: MessagesInDistanceRange) -> Result<Vec<MessageText>, sqlx::Error> {
+    async fn process(
+        &self,
+        input: MessagesInDistanceRange,
+    ) -> Result<Vec<MessageText>, sqlx::Error> {
         sqlx::query_file_as!(
             MessageText,
             "sql/messages_in_distance_range.sql",

@@ -71,7 +71,10 @@ impl Processor<CreateSessionRequest> for SessionService {
     type Error = Error;
     #[instrument(skip_all, name = "CreateSession", err, fields(user_id = %input.user_id))]
     async fn process(&self, input: CreateSessionRequest) -> Result<Self::Output, Self::Error> {
-        let config = self.db.process(FindConfig::<AuthModuleConfig>::new()).await?;
+        let config = self
+            .db
+            .process(FindConfig::<AuthModuleConfig>::new())
+            .await?;
 
         let now = time::OffsetDateTime::now_utc();
         let expires = now + time::Duration::seconds(config.session.ttl as i64);

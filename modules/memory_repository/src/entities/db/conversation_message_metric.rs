@@ -66,11 +66,8 @@ impl Processor<LatestCumulativeDistance> for DatabaseProcessor {
     #[instrument(skip_all, name = "SQL:LatestCumulativeDistance", err,
         fields(conversation_id = input.conversation_id))]
     async fn process(&self, input: LatestCumulativeDistance) -> Result<i64, sqlx::Error> {
-        sqlx::query_file_scalar!(
-            "sql/latest_cumulative_distance.sql",
-            input.conversation_id,
-        )
-        .fetch_one(self.db())
-        .await
+        sqlx::query_file_scalar!("sql/latest_cumulative_distance.sql", input.conversation_id,)
+            .fetch_one(self.db())
+            .await
     }
 }

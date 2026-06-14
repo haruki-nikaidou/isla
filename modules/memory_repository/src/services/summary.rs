@@ -92,10 +92,8 @@ pub fn select_context(
     let cutoff = raw_message_ids.last().copied().unwrap_or(i64::MAX);
 
     // Prefer more-compressed nodes first, then oldest span first for stability.
-    let mut ordered: Vec<&SummaryCandidate> = summaries
-        .iter()
-        .filter(|s| s.to_id < cutoff)
-        .collect();
+    let mut ordered: Vec<&SummaryCandidate> =
+        summaries.iter().filter(|s| s.to_id < cutoff).collect();
     ordered.sort_by(|a, b| b.level.cmp(&a.level).then(a.from_id.cmp(&b.from_id)));
 
     let mut summary_ids = Vec::new();

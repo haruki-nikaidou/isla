@@ -86,8 +86,9 @@ pub fn finalized_nodes(cum_prev: i64, cum_new: i64, base: i64) -> Vec<NodeAddr> 
 /// `i64` is not a real scenario).
 fn node_width(base: i64, level: i32) -> Result<i64, Error> {
     let exp = u32::try_from(level).map_err(|_| Error::InvalidInput)?;
-    base.checked_pow(exp)
-        .ok_or_else(|| Error::BusinessPanic(anyhow::anyhow!("segment-tree level {level} overflows")))
+    base.checked_pow(exp).ok_or_else(|| {
+        Error::BusinessPanic(anyhow::anyhow!("segment-tree level {level} overflows"))
+    })
 }
 
 fn now_unix() -> i64 {
