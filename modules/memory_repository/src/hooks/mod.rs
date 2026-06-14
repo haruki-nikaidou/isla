@@ -17,10 +17,8 @@ use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::Error;
 use wakuwaku::amqp::AmqpMessageProcessor;
-use wakuwaku::sqlx::DatabaseProcessor;
 
-use crate::entities::db::embedding::{DeleteEmbeddingByRef, UpdateEmbeddingPrivacyByRef};
-use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended};
+use crate::events::publish::{EntryUpserted, MessageAppended};
 use crate::services::embedding::{Embedder, EmbeddingService, IndexEntry};
 use crate::services::segment_tree::{RecordMessage, SegmentTreeService, SemanticScorer};
 
@@ -66,8 +64,8 @@ where
     }
 }
 
-/// Keeps the RAG embedding index in sync with source entries: (re)embeds on
-/// [`EntryUpserted`] and removes on [`EntryRemoved`].
+/// Keeps the RAG embedding index in sync with source entries by (re)embedding
+/// on [`EntryUpserted`].
 #[derive(Clone)]
 pub struct EmbeddingUpdateHook<E> {
     pub service: EmbeddingService<E>,
@@ -102,54 +100,3 @@ where
     }
 }
 
-impl<E> AmqpMessageProcessor<EntryRemoved> for EmbeddingUpdateHook<E>
-where
-    E: Embedder + Send + Sync,
-{
-    const QUEUE: &'static str = "memory_embedding_remove";
-}
-
-impl<E> Processor<EntryRemoved> for EmbeddingUpdateHook<E>
-where
-    E: Embedder + Send + Sync,
-{
-    type Output = ();
-    type Error = Error;
-
-    #[instrument(skip_all, name = "EntryRemoved", err)]
-    async fn process(&self, event: EntryRemoved) -> Result<(), Error> {
-        self.service
-            .database
-            .process(DeleteEmbeddingByRef {
-                reference: event.reference,
-            })
-            .await?;
-        Ok(())
-    }
-}
-
-/// Propagates a source entry's privacy change to its embedding row.
-#[derive(Debug, Clone)]
-pub struct EmbeddingPrivacyHook {
-    pub database: DatabaseProcessor,
-}
-
-impl AmqpMessageProcessor<EntryPrivacyChanged> for EmbeddingPrivacyHook {
-    const QUEUE: &'static str = "memory_embedding_privacy";
-}
-
-impl Processor<EntryPrivacyChanged> for EmbeddingPrivacyHook {
-    type Output = ();
-    type Error = Error;
-
-    #[instrument(skip_all, name = "EntryPrivacyChanged", err)]
-    async fn process(&self, event: EntryPrivacyChanged) -> Result<(), Error> {
-        self.database
-            .process(UpdateEmbeddingPrivacyByRef {
-                reference: event.reference,
-                privacy: event.privacy,
-            })
-            .await?;
-        Ok(())
-    }
-}

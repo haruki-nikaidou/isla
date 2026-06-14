@@ -18,7 +18,7 @@ use crate::entities::db::{
     },
 };
 use crate::entities::redis::EntryContent;
-use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
+use crate::events::publish::EntryUpserted;
 
 #[derive(Clone)]
 pub struct DiaryService {
@@ -194,17 +194,6 @@ impl Processor<UpdateDiaryPrivacyRequest> for DiaryService {
                 privacy: input.privacy,
             })
             .await?;
-        if updated {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryPrivacyChanged {
-                    reference: EntryRef::diary(input.id),
-                    privacy: input.privacy,
-                },
-            )
-            .await?;
-        }
         Ok(updated)
     }
 }
@@ -222,16 +211,6 @@ impl Processor<DeleteDiaryRequest> for DiaryService {
     #[instrument(skip_all, name = "DeleteDiaryRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteDiaryRequest) -> Result<bool, Error> {
         let deleted = self.database.process(DeleteDiary { id: input.id }).await?;
-        if deleted {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryRemoved {
-                    reference: EntryRef::diary(input.id),
-                },
-            )
-            .await?;
-        }
         Ok(deleted)
     }
 }

@@ -28,7 +28,7 @@ use crate::entities::db::{
     },
 };
 use crate::entities::redis::EntryContent;
-use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
+use crate::events::publish::EntryUpserted;
 
 #[derive(Clone)]
 pub struct ContactService {
@@ -215,17 +215,6 @@ impl Processor<UpdateContactIdentityPrivacyRequest> for ContactService {
                 privacy: input.privacy,
             })
             .await?;
-        if updated {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryPrivacyChanged {
-                    reference: EntryRef::contact(input.id),
-                    privacy: input.privacy,
-                },
-            )
-            .await?;
-        }
         Ok(updated)
     }
 }
@@ -246,16 +235,6 @@ impl Processor<DeleteContactIdentityRequest> for ContactService {
             .database
             .process(DeleteContactIdentity { id: input.id })
             .await?;
-        if deleted {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryRemoved {
-                    reference: EntryRef::contact(input.id),
-                },
-            )
-            .await?;
-        }
         Ok(deleted)
     }
 }

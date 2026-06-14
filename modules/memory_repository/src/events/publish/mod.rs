@@ -39,35 +39,6 @@ impl AmqpRouting for EntryUpserted {
 }
 impl AmqpMessageSend for EntryUpserted {}
 
-/// Emitted when a source entry's privacy changes; the index inherits it.
-/// Consumed by `EmbeddingPrivacyHook`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonMessageDe, JsonMessageSer)]
-pub struct EntryPrivacyChanged {
-    pub reference: EntryRef,
-    pub privacy: PrivacyControlFlag,
-}
-
-impl AmqpRouting for EntryPrivacyChanged {
-    const EXCHANGE: &'static str = "memory.events";
-    const EXCHANGE_TYPE: AmqpExchangeType = AmqpExchangeType::Topic;
-    const ROUTING_KEY: &'static str = "entry.privacy_changed";
-}
-impl AmqpMessageSend for EntryPrivacyChanged {}
-
-/// Emitted when a source entry is deleted; its embedding must be removed.
-/// Consumed by `EmbeddingUpdateHook`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonMessageDe, JsonMessageSer)]
-pub struct EntryRemoved {
-    pub reference: EntryRef,
-}
-
-impl AmqpRouting for EntryRemoved {
-    const EXCHANGE: &'static str = "memory.events";
-    const EXCHANGE_TYPE: AmqpExchangeType = AmqpExchangeType::Topic;
-    const ROUTING_KEY: &'static str = "entry.removed";
-}
-impl AmqpMessageSend for EntryRemoved {}
-
 /// Emitted when a message is appended to a conversation. Consumed by
 /// `MessageMetricHook`, which scores the topical shift, records the metric, and
 /// registers placeholders for any nodes the append filled. Keeps the LLM scorer

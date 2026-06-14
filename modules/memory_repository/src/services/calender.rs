@@ -35,7 +35,7 @@ use crate::entities::db::{
     },
 };
 use crate::entities::redis::EntryContent;
-use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
+use crate::events::publish::EntryUpserted;
 
 #[derive(Clone)]
 pub struct CalenderService {
@@ -324,16 +324,6 @@ impl Processor<DeleteCalenderEventRequest> for CalenderService {
             .database
             .process(DeleteCalenderEvent { id: input.id })
             .await?;
-        if deleted {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryRemoved {
-                    reference: EntryRef::calender_event(input.id),
-                },
-            )
-            .await?;
-        }
         Ok(deleted)
     }
 }
@@ -358,17 +348,6 @@ impl Processor<UpdateCalenderEventPrivacyRequest> for CalenderService {
                 privacy: input.privacy,
             })
             .await?;
-        if updated {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryPrivacyChanged {
-                    reference: EntryRef::calender_event(input.id),
-                    privacy: input.privacy,
-                },
-            )
-            .await?;
-        }
         Ok(updated)
     }
 }

@@ -27,7 +27,7 @@ use crate::entities::db::{
     },
 };
 use crate::entities::redis::{EntryContent, MessageExcerpt};
-use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended};
+use crate::events::publish::{EntryUpserted, MessageAppended};
 
 #[derive(Clone)]
 pub struct ConversationService {
@@ -187,17 +187,6 @@ impl Processor<UpdateConversationPrivacyRequest> for ConversationService {
                 privacy: input.privacy,
             })
             .await?;
-        if updated {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryPrivacyChanged {
-                    reference: EntryRef::conversation(input.id),
-                    privacy: input.privacy,
-                },
-            )
-            .await?;
-        }
         Ok(updated)
     }
 }
@@ -268,16 +257,6 @@ impl Processor<DeleteConversationRequest> for ConversationService {
             .database
             .process(DeleteConversation { id: input.id })
             .await?;
-        if deleted {
-            ContextRef::publish(
-                &self.redis,
-                &self.sender,
-                EntryRemoved {
-                    reference: EntryRef::conversation(input.id),
-                },
-            )
-            .await?;
-        }
         Ok(deleted)
     }
 }
