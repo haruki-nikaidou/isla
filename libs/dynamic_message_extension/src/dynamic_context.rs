@@ -106,9 +106,16 @@ struct ContextRefWire {
 ///
 /// Carries only a [`Uuid`]; routing is inherited from `T` so the message lands
 /// on the same exchange/routing key the body would have used directly.
+///
+/// Implements [`serde::Serialize`] / [`serde::Deserialize`] so it can be
+/// embedded as a field in other serializable event structs, while the payload
+/// `T` remains stored exclusively in Redis.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ContextRef<T> {
     /// Redis pointer to the stored body.
     pub context_id: Uuid,
+    #[serde(skip)]
     _marker: PhantomData<fn() -> T>,
 }
 
@@ -158,6 +165,52 @@ impl<T: AmqpRouting> AmqpRouting for ContextRef<T> {
 }
 
 impl<T: AmqpRouting + Send> AmqpMessageSend for ContextRef<T> {}
+
+impl<T> ContextRef<T>
+where
+    T: Clone + MessageDe + Send + Sync,
+{
+    /// Resolve this pointer by fetching the body from the Redis context store.
+    ///
+    /// Returns [`Error::NotFound`] if the body has expired or was never written —
+    /// a permanent condition that a redelivery cannot fix.
+    pub async fn resolve(redis: &RedisPool, ptr: Self) -> Result<T, Error> {
+        let mut pooled = acquire(redis).await?;
+        let conn = pooled.get_mut().ok_or_else(|| {
+            Error::Io(anyhow::anyhow!("Redis connection unexpectedly closed"))
+        })?;
+        StoredContext::<T>::read(conn, context_key(ptr.context_id))
+            .await?
+            .ok_or(Error::NotFound)
+    }
+}
+
+impl<T> ContextRef<T>
+where
+    T: Clone + MessageSer + Send + Sync,
+{
+    /// Write `body` to the Redis context store under a fresh [`Uuid`] and
+    /// return a pointer to it.
+    ///
+    /// Unlike [`ContextRef::publish`], this does *not* send anything on the
+    /// bus. Use this to store a sub-payload that will be embedded as a field
+    /// inside a larger event struct, which is then published separately.
+    pub async fn store(redis: &RedisPool, body: T) -> Result<Self, Error> {
+        let context_id = Uuid::new_v4();
+        let mut pooled = acquire(redis).await?;
+        let conn = pooled.get_mut().ok_or_else(|| {
+            Error::Io(anyhow::anyhow!("Redis connection unexpectedly closed"))
+        })?;
+        StoredContext::<T>::write_kv_with_ttl(
+            conn,
+            context_key(context_id),
+            body,
+            DEFAULT_CONTEXT_TTL,
+        )
+        .await?;
+        Ok(Self::new(context_id))
+    }
+}
 
 impl<T> ContextRef<T>
 where

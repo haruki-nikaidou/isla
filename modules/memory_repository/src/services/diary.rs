@@ -17,6 +17,7 @@ use crate::entities::db::{
         UpdateDiary, UpdateDiaryPrivacy,
     },
 };
+use crate::entities::redis::EntryContent;
 use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 
 #[derive(Clone)]
@@ -26,17 +27,37 @@ pub struct DiaryService {
     pub redis: RedisPool,
 }
 
-impl DiaryService {
-    /// Publish an [`EntryUpserted`] for a diary so the RAG index (re)embeds it.
-    async fn publish_upsert(&self, id: i64) -> Result<(), Error> {
+/// Publish an [`EntryUpserted`] for a diary so the RAG index (re)embeds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublishDiaryUpsertRequest {
+    pub id: i64,
+}
+
+impl Processor<PublishDiaryUpsertRequest> for DiaryService {
+    type Output = ();
+    type Error = Error;
+
+    #[instrument(skip_all, name = "PublishDiaryUpsertRequest", err, fields(id = input.id))]
+    async fn process(&self, input: PublishDiaryUpsertRequest) -> Result<(), Error> {
+        let id = input.id;
         if let Some(d) = self.database.process(FindDiaryById { id }).await? {
+            let text = format!("{}\n{}\n{}", d.title, d.summary, d.content);
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::diary(id),
+                    privacy: d.privacy,
+                    content: text,
+                },
+            )
+            .await?;
             ContextRef::publish(
                 &self.redis,
                 &self.sender,
                 EntryUpserted {
                     reference: EntryRef::diary(id),
                     privacy: d.privacy,
-                    content: format!("{}\n{}\n{}", d.title, d.summary, d.content),
+                    content,
                 },
             )
             .await?;
@@ -76,7 +97,7 @@ impl Processor<CreateDiaryRequest> for DiaryService {
                 privacy: input.privacy,
             })
             .await?;
-        self.publish_upsert(id).await?;
+        self.process(PublishDiaryUpsertRequest { id }).await?;
         Ok(id)
     }
 }
@@ -147,7 +168,7 @@ impl Processor<UpdateDiaryRequest> for DiaryService {
             })
             .await?;
         if updated {
-            self.publish_upsert(input.id).await?;
+            self.process(PublishDiaryUpsertRequest { id: input.id }).await?;
         }
         Ok(updated)
     }

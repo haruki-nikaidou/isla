@@ -26,6 +26,7 @@ use crate::entities::db::{
         SetConversationMessageBranch,
     },
 };
+use crate::entities::redis::{EntryContent, MessageExcerpt};
 use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended};
 
 #[derive(Clone)]
@@ -35,15 +36,34 @@ pub struct ConversationService {
     pub redis: RedisPool,
 }
 
-impl ConversationService {
-    /// Publish an [`EntryUpserted`] for a conversation so the RAG index
-    /// (re)embeds it from its summaries.
-    async fn publish_upsert(&self, id: i64) -> Result<(), Error> {
+/// Publish an [`EntryUpserted`] for a conversation so the RAG index
+/// (re)embeds it from its summaries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublishConversationUpsertRequest {
+    pub id: i64,
+}
+
+impl Processor<PublishConversationUpsertRequest> for ConversationService {
+    type Output = ();
+    type Error = Error;
+
+    #[instrument(skip_all, name = "PublishConversationUpsertRequest", err, fields(id = input.id))]
+    async fn process(&self, input: PublishConversationUpsertRequest) -> Result<(), Error> {
+        let id = input.id;
         if let Some(c) = self.database.process(FindConversationById { id }).await? {
-            let content = match c.closing_summary {
+            let text = match c.closing_summary {
                 Some(closing) => format!("{}\n{}", c.opening_summary, closing),
                 None => c.opening_summary,
             };
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::conversation(id),
+                    privacy: c.privacy,
+                    content: text,
+                },
+            )
+            .await?;
             ContextRef::publish(
                 &self.redis,
                 &self.sender,
@@ -93,7 +113,7 @@ impl Processor<CreateConversationRequest> for ConversationService {
                 privacy: input.privacy,
             })
             .await?;
-        self.publish_upsert(id).await?;
+        self.process(PublishConversationUpsertRequest { id }).await?;
         Ok(id)
     }
 }
@@ -141,7 +161,7 @@ impl Processor<UpdateOpeningSummaryRequest> for ConversationService {
             })
             .await?;
         if updated {
-            self.publish_upsert(input.id).await?;
+            self.process(PublishConversationUpsertRequest { id: input.id }).await?;
         }
         Ok(updated)
     }
@@ -204,7 +224,7 @@ impl Processor<CloseConversationRequest> for ConversationService {
             })
             .await?;
         if closed {
-            self.publish_upsert(input.id).await?;
+            self.process(PublishConversationUpsertRequest { id: input.id }).await?;
         }
         Ok(closed)
     }
@@ -329,13 +349,18 @@ impl Processor<AppendMessageRequest> for ConversationService {
                 conversation_updated_at: now_unix(),
             })
             .await?;
+        let current_excerpt = ContextRef::store(
+            &self.redis,
+            MessageExcerpt { current_excerpt: excerpt },
+        )
+        .await?;
         ContextRef::publish(
             &self.redis,
             &self.sender,
             MessageAppended {
                 conversation_id,
                 message_id,
-                current_excerpt: excerpt,
+                current_excerpt,
             },
         )
         .await?;

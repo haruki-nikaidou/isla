@@ -34,6 +34,7 @@ use crate::entities::db::{
         UpdateCalenderTask, UpdateCalenderTaskPrivacy, UpdateCalenderTaskStatus,
     },
 };
+use crate::entities::redis::EntryContent;
 use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 
 #[derive(Clone)]
@@ -43,18 +44,38 @@ pub struct CalenderService {
     pub redis: RedisPool,
 }
 
-impl CalenderService {
-    /// Publish an [`EntryUpserted`] for a calendar event so the RAG index
-    /// (re)embeds it.
-    async fn publish_event_upsert(&self, id: i64) -> Result<(), Error> {
+/// Publish an [`EntryUpserted`] for a calendar event so the RAG index
+/// (re)embeds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublishCalenderEventUpsertRequest {
+    pub id: i64,
+}
+
+impl Processor<PublishCalenderEventUpsertRequest> for CalenderService {
+    type Output = ();
+    type Error = Error;
+
+    #[instrument(skip_all, name = "PublishCalenderEventUpsertRequest", err, fields(id = input.id))]
+    async fn process(&self, input: PublishCalenderEventUpsertRequest) -> Result<(), Error> {
+        let id = input.id;
         if let Some(e) = self.database.process(FindCalenderEventById { id }).await? {
+            let text = format!("{}\n{}", e.title, e.description);
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::calender_event(id),
+                    privacy: e.privacy,
+                    content: text,
+                },
+            )
+            .await?;
             ContextRef::publish(
                 &self.redis,
                 &self.sender,
                 EntryUpserted {
                     reference: EntryRef::calender_event(id),
                     privacy: e.privacy,
-                    content: format!("{}\n{}", e.title, e.description),
+                    content,
                 },
             )
             .await?;
@@ -222,7 +243,7 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
                 privacy: input.privacy,
             })
             .await?;
-        self.publish_event_upsert(id).await?;
+        self.process(PublishCalenderEventUpsertRequest { id }).await?;
         Ok(id)
     }
 }
@@ -281,7 +302,7 @@ impl Processor<UpdateCalenderEventRequest> for CalenderService {
             })
             .await?;
         if updated {
-            self.publish_event_upsert(input.id).await?;
+            self.process(PublishCalenderEventUpsertRequest { id: input.id }).await?;
         }
         Ok(updated)
     }

@@ -27,6 +27,7 @@ use crate::entities::db::{
         ListContactStoriesByIdentity, StoryType, UpdateContactStory, UpdateContactStoryPrivacy,
     },
 };
+use crate::entities::redis::EntryContent;
 use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 
 #[derive(Clone)]
@@ -36,22 +37,43 @@ pub struct ContactService {
     pub redis: RedisPool,
 }
 
-impl ContactService {
-    /// Publish an [`EntryUpserted`] for a contact identity so the RAG index
-    /// (re)embeds it.
-    async fn publish_identity_upsert(&self, id: Uuid) -> Result<(), Error> {
+#[derive(Debug, Clone, Copy)]
+/// Publish an [`EntryUpserted`] for a contact identity so the RAG index
+/// (re)embeds it.
+pub struct PublishIdentityUpsertRequest {
+    pub id: Uuid,
+}
+
+impl Processor<PublishIdentityUpsertRequest> for ContactService {
+    type Output = ();
+    type Error = Error;
+    async fn process(
+        &self,
+        input: PublishIdentityUpsertRequest,
+    ) -> Result<Self::Output, Self::Error> {
+        let id = input.id;
         if let Some(i) = self
             .database
             .process(FindContactIdentityById { id })
             .await?
         {
+            let text = format!("{}\n{}", i.identify_name, i.description);
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::contact(id),
+                    privacy: i.privacy,
+                    content: text,
+                },
+            )
+            .await?;
             ContextRef::publish(
                 &self.redis,
                 &self.sender,
                 EntryUpserted {
                     reference: EntryRef::contact(id),
                     privacy: i.privacy,
-                    content: format!("{}\n{}", i.identify_name, i.description),
+                    content,
                 },
             )
             .await?;
@@ -90,7 +112,7 @@ impl Processor<CreateContactIdentityRequest> for ContactService {
                 privacy: input.privacy,
             })
             .await?;
-        self.publish_identity_upsert(id).await?;
+        self.process(PublishIdentityUpsertRequest { id }).await?;
         Ok(id)
     }
 }
@@ -143,7 +165,8 @@ impl Processor<UpdateContactIdentityRequest> for ContactService {
             })
             .await?;
         if updated {
-            self.publish_identity_upsert(input.id).await?;
+            self.process(PublishIdentityUpsertRequest { id: input.id })
+                .await?;
         }
         Ok(updated)
     }

@@ -7,7 +7,12 @@
 //! lazily by the read-path saga in
 //! [`SummaryService`](crate::services::summary::SummaryService), not eagerly
 //! here, so an append no longer cascades a chain of resummarizations.
+//!
+//! Event structs carry only metadata plus [`ContextRef`] pointers; each hook
+//! resolves the content pointer against Redis before forwarding to its inner
+//! service.
 
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::Error;
@@ -26,6 +31,7 @@ use crate::services::segment_tree::{RecordMessage, SegmentTreeService, SemanticS
 #[derive(Clone)]
 pub struct MessageMetricHook<Sc, Su> {
     pub service: SegmentTreeService<Sc, Su>,
+    pub redis: RedisPool,
 }
 
 impl<Sc, Su> AmqpMessageProcessor<MessageAppended> for MessageMetricHook<Sc, Su>
@@ -47,12 +53,13 @@ where
     #[instrument(skip_all, name = "MessageAppended", err,
         fields(conversation_id = event.conversation_id, message_id = event.message_id))]
     async fn process(&self, event: MessageAppended) -> Result<(), Error> {
+        let excerpt = ContextRef::resolve(&self.redis, event.current_excerpt).await?;
         self.service
             .process(RecordMessage {
                 conversation_id: event.conversation_id,
                 message_id: event.message_id,
                 previous_excerpt: String::new(),
-                current_excerpt: event.current_excerpt,
+                current_excerpt: excerpt.current_excerpt,
             })
             .await?;
         Ok(())
@@ -61,9 +68,10 @@ where
 
 /// Keeps the RAG embedding index in sync with source entries: (re)embeds on
 /// [`EntryUpserted`] and removes on [`EntryRemoved`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EmbeddingUpdateHook<E> {
     pub service: EmbeddingService<E>,
+    pub redis: RedisPool,
 }
 
 impl<E> AmqpMessageProcessor<EntryUpserted> for EmbeddingUpdateHook<E>
@@ -82,11 +90,12 @@ where
 
     #[instrument(skip_all, name = "EntryUpserted", err)]
     async fn process(&self, event: EntryUpserted) -> Result<(), Error> {
+        let content = ContextRef::resolve(&self.redis, event.content).await?;
         self.service
             .process(IndexEntry {
-                reference: event.reference,
-                privacy: event.privacy,
-                content: event.content,
+                reference: content.reference,
+                privacy: content.privacy,
+                content: content.content,
             })
             .await?;
         Ok(())
