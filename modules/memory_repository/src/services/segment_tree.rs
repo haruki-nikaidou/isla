@@ -3,10 +3,20 @@
 //! Summaries form a segment tree whose combine operation is "summarize" — a
 //! monoid with the empty summary as identity. The tree is bucketed along
 //! *cumulative semantic distance*: a message at cumulative distance `S` belongs
-//! to bucket `floor(S / base^level)` at each level. A node is **finalized**
-//! (summarized once, never to change) when the cumulative distance crosses the
-//! upper boundary of its bucket; the still-growing tail is represented by raw
-//! recent messages instead.
+//! to bucket `floor(S / base^level)` at each level. A node's bucket is **full**
+//! once the cumulative distance crosses its upper boundary; the still-growing
+//! tail is represented by raw recent messages instead.
+//!
+//! Summarizing is **lazy**. Appending a message does not recompute any summary —
+//! [`RecordMessage`] only scores the message, records its metric, and registers
+//! the nodes whose buckets just filled as empty placeholders (see
+//! [`finalized_nodes`]). The (LLM-backed) summary itself is produced by
+//! [`RecomputeNode`] only when a node is needed: the read-path saga in
+//! [`SummaryService`](crate::services::summary::SummaryService) calls it for the
+//! stale nodes a context plan selects. Each summary records, in
+//! `last_summary_children`, how many children it folded in, so a node is known
+//! to be stale (cheaply, without resummarizing) whenever its child count has
+//! since grown — possible only on still-open nodes, since history is append-only.
 //!
 //! [`finalized_nodes`] is a pure function (the intellectual core) and is unit
 //! tested without a database. [`SegmentTreeService`] records per-message metrics
@@ -22,7 +32,8 @@ use crate::entities::db::conversation_message_metric::{
     CreateConversationMessageMetric, LatestCumulativeDistance,
 };
 use crate::entities::db::conversation_summary_node::{
-    ListChildSummaryNodes, MessagesInDistanceRange, UpsertConversationSummaryNode,
+    InsertSummaryNodePlaceholder, ListChildSummaryNodes, MessageIdBoundsInDistanceRange,
+    MessagesInDistanceRange, UpsertConversationSummaryNode,
 };
 
 /// Branching factor of the tree: a new node is created each time the cumulative
@@ -150,8 +161,12 @@ pub struct SegmentTreeService<Sc, Su> {
     pub summarizer: Su,
 }
 
-/// Score and record a newly appended message, returning the segment-tree nodes
-/// that this append finalized (and therefore need (re)summarizing).
+/// Score and record a newly appended message, registering (as empty
+/// placeholders) the segment-tree nodes whose buckets this append filled.
+///
+/// Summaries are *not* computed here: filling a bucket only records that the
+/// node exists, leaving its (LLM-backed) summary to be produced lazily by the
+/// read-path saga. Returns the newly-full node addresses for observability.
 #[derive(Debug, Clone)]
 pub struct RecordMessage {
     pub conversation_id: i64,
@@ -198,7 +213,36 @@ where
             })
             .await?;
 
-        Ok(finalized_nodes(cum_prev, cum_new, SEGMENT_BASE))
+        // Register the now-full nodes as placeholders so the read-path saga can
+        // discover and summarize them on demand. Cheap inserts only — no LLM.
+        let full = finalized_nodes(cum_prev, cum_new, SEGMENT_BASE);
+        let ts = now_unix();
+        for node in &full {
+            let width = node_width(SEGMENT_BASE, node.level)?;
+            let distance_from = node.bucket.saturating_mul(width);
+            let distance_to = distance_from.saturating_add(width);
+            let bounds = self
+                .database
+                .process(MessageIdBoundsInDistanceRange {
+                    conversation_id: input.conversation_id,
+                    distance_from,
+                    distance_to,
+                })
+                .await?;
+            self.database
+                .process(InsertSummaryNodePlaceholder {
+                    conversation_id: input.conversation_id,
+                    level: node.level,
+                    bucket: node.bucket,
+                    covers_from_message_id: bounds.from_id,
+                    covers_to_message_id: bounds.to_id,
+                    distance_from,
+                    distance_to,
+                    updated_at: ts,
+                })
+                .await?;
+        }
+        Ok(full)
     }
 }
 
@@ -226,7 +270,7 @@ where
         let distance_from = bucket.saturating_mul(width);
         let distance_to = distance_from.saturating_add(width);
 
-        let (parts, covers_from, covers_to) = if level <= 1 {
+        let (parts, covers_from, covers_to): (Vec<String>, i64, i64) = if level <= 1 {
             let messages = self
                 .database
                 .process(MessagesInDistanceRange {
@@ -263,7 +307,18 @@ where
             (parts, covers_from, covers_to)
         };
 
+        let child_count = parts.len() as i64;
         let summary = self.summarizer.process(Summarize { level, parts }).await?;
+
+        // The node is still open (its summary may go stale again) until the
+        // cumulative distance has advanced past its bucket's upper bound.
+        let max_cum = self
+            .database
+            .process(LatestCumulativeDistance {
+                conversation_id: input.conversation_id,
+            })
+            .await?;
+        let is_open = max_cum < distance_to;
 
         let id = self
             .database
@@ -276,7 +331,8 @@ where
                 distance_from,
                 distance_to,
                 summary,
-                is_open: false,
+                is_open,
+                last_summary_children: child_count,
                 updated_at: now_unix(),
             })
             .await?;

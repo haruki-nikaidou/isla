@@ -1,71 +1,33 @@
 //! Lifecycle hooks for memory operations.
 //!
-//! Hooks consume AMQP events and keep derived state in sync. Today this is the
-//! summary segment tree: [`SegmentTreeHook`] reacts to
-//! [`SummaryNodesDirty`](crate::events::publish::SummaryNodesDirty) by
-//! recomputing the finalized nodes.
+//! Hooks consume AMQP events and keep derived state in sync. For the summary
+//! segment tree this is [`MessageMetricHook`]: it scores each appended message,
+//! records its topical-shift metric, and registers (as empty placeholders) the
+//! nodes whose buckets the append filled. Summaries themselves are produced
+//! lazily by the read-path saga in
+//! [`SummaryService`](crate::services::summary::SummaryService), not eagerly
+//! here, so an append no longer cascades a chain of resummarizations.
 
 use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::Error;
-use wakuwaku::amqp::{AmqpMessageProcessor, AmqpMessageSend, AmqpPool};
+use wakuwaku::amqp::AmqpMessageProcessor;
 use wakuwaku::sqlx::DatabaseProcessor;
 
 use crate::entities::db::embedding::{DeleteEmbeddingByRef, UpdateEmbeddingPrivacyByRef};
 use crate::events::publish::{
-    EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended, SummaryNodesDirty,
+    EntryPrivacyChanged, EntryRemoved, EntryUpserted, MessageAppended,
 };
 use crate::services::embedding::{Embedder, EmbeddingService, IndexEntry};
-use crate::services::segment_tree::{
-    RecomputeNode, RecordMessage, SegmentTreeService, SemanticScorer, Summarizer,
-};
+use crate::services::segment_tree::{RecordMessage, SegmentTreeService, SemanticScorer};
 
-/// Recomputes summary segment-tree nodes when an append finalizes them.
-#[derive(Debug, Clone)]
-pub struct SegmentTreeHook<Sc, Su> {
-    pub service: SegmentTreeService<Sc, Su>,
-}
-
-impl<Sc, Su> AmqpMessageProcessor<SummaryNodesDirty> for SegmentTreeHook<Sc, Su>
-where
-    Sc: Send + Sync,
-    Su: Summarizer + Send + Sync,
-{
-    const QUEUE: &'static str = "memory_segment_tree_recompute";
-}
-
-impl<Sc, Su> Processor<SummaryNodesDirty> for SegmentTreeHook<Sc, Su>
-where
-    Sc: Send + Sync,
-    Su: Summarizer + Send + Sync,
-{
-    type Output = ();
-    type Error = Error;
-
-    #[instrument(skip_all, name = "SummaryNodesDirty", err,
-        fields(conversation_id = event.conversation_id, nodes = event.nodes.len()))]
-    async fn process(&self, event: SummaryNodesDirty) -> Result<(), Error> {
-        // `nodes` arrives children-before-parents, so a sequential recompute
-        // sees each child already finalized before its parent combines them.
-        for node in event.nodes {
-            self.service
-                .process(RecomputeNode {
-                    conversation_id: event.conversation_id,
-                    node,
-                })
-                .await?;
-        }
-        Ok(())
-    }
-}
-
-/// Scores an appended message, records its segment-tree metric, and emits
-/// [`SummaryNodesDirty`] for any nodes the append finalized — running the LLM
-/// scorer off the synchronous write path.
+/// Scores an appended message, records its segment-tree metric, and registers
+/// the now-full nodes as placeholders — running the LLM scorer off the
+/// synchronous write path. Summarizing the registered nodes is deferred to the
+/// read-path saga.
 #[derive(Clone)]
 pub struct MessageMetricHook<Sc, Su> {
     pub service: SegmentTreeService<Sc, Su>,
-    pub mq: AmqpPool,
 }
 
 impl<Sc, Su> AmqpMessageProcessor<MessageAppended> for MessageMetricHook<Sc, Su>
@@ -87,8 +49,7 @@ where
     #[instrument(skip_all, name = "MessageAppended", err,
         fields(conversation_id = event.conversation_id, message_id = event.message_id))]
     async fn process(&self, event: MessageAppended) -> Result<(), Error> {
-        let nodes = self
-            .service
+        self.service
             .process(RecordMessage {
                 conversation_id: event.conversation_id,
                 message_id: event.message_id,
@@ -96,14 +57,6 @@ where
                 current_excerpt: event.current_excerpt,
             })
             .await?;
-        if !nodes.is_empty() {
-            SummaryNodesDirty {
-                conversation_id: event.conversation_id,
-                nodes,
-            }
-            .send(&self.mq)
-            .await?;
-        }
         Ok(())
     }
 }

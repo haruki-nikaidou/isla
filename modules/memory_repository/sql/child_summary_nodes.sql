@@ -12,6 +12,7 @@ SELECT
     distance_to,
     summary,
     is_open,
+    last_summary_children,
     updated_at
 FROM memory.conversation_summary_node
 WHERE conversation_id = $1

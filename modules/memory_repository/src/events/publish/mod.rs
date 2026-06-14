@@ -6,7 +6,6 @@ use wakuwaku::amqp::{AmqpExchangeType, AmqpMessageSend, AmqpRouting};
 
 use crate::entities::db::PrivacyControlFlag;
 use crate::entities::db::embedding::EntryRef;
-use crate::services::segment_tree::NodeAddr;
 
 /// Helper: JSON `MessageSer`/`MessageDe` for an event type.
 macro_rules! json_message {
@@ -76,8 +75,9 @@ json_message!(EntryRemoved);
 
 /// Emitted when a message is appended to a conversation. Consumed by
 /// `MessageMetricHook`, which scores the topical shift, records the metric, and
-/// emits [`SummaryNodesDirty`] for any nodes the append finalized. Keeps the
-/// LLM scorer out of the synchronous write path.
+/// registers placeholders for any nodes the append filled. Keeps the LLM scorer
+/// out of the synchronous write path. Node summaries are produced lazily by the
+/// read-path saga, so no resummarization is triggered here.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageAppended {
     pub conversation_id: i64,
@@ -93,24 +93,3 @@ impl AmqpRouting for MessageAppended {
 }
 impl AmqpMessageSend for MessageAppended {}
 json_message!(MessageAppended);
-
-/// Emitted when appending a message finalizes one or more summary segment-tree
-/// nodes that now need (re)summarizing.
-///
-/// Consumed by [`SegmentTreeHook`](crate::hooks::SegmentTreeHook), which
-/// recomputes each node bottom-up via the summary monoid. `nodes` is ordered
-/// children-before-parents.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SummaryNodesDirty {
-    pub conversation_id: i64,
-    pub nodes: Vec<NodeAddr>,
-}
-
-impl AmqpRouting for SummaryNodesDirty {
-    const EXCHANGE: &'static str = "memory.events";
-    const EXCHANGE_TYPE: AmqpExchangeType = AmqpExchangeType::Topic;
-    const ROUTING_KEY: &'static str = "conversation.summary.dirty";
-}
-
-impl AmqpMessageSend for SummaryNodesDirty {}
-json_message!(SummaryNodesDirty);

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Insert or refresh a segment-tree node addressed by (conversation, level,\n-- bucket). On re-summarization the covered range, distances, summary text,\n-- open-flag, child watermark and timestamp are overwritten.\nINSERT INTO memory.conversation_summary_node\n    (conversation_id, level, bucket, covers_from_message_id, covers_to_message_id,\n     distance_from, distance_to, summary, is_open, last_summary_children, updated_at)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\nON CONFLICT (conversation_id, level, bucket) DO UPDATE SET\n    covers_from_message_id = EXCLUDED.covers_from_message_id,\n    covers_to_message_id   = EXCLUDED.covers_to_message_id,\n    distance_from          = EXCLUDED.distance_from,\n    distance_to            = EXCLUDED.distance_to,\n    summary                = EXCLUDED.summary,\n    is_open                = EXCLUDED.is_open,\n    last_summary_children  = EXCLUDED.last_summary_children,\n    updated_at             = EXCLUDED.updated_at\nRETURNING id\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Text",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "34cc6f5e942c9ad4ea4295473a19bcf778091bc6c6634f07502e0fc3ba63792c"
+}
