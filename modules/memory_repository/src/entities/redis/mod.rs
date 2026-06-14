@@ -28,12 +28,14 @@ pub struct EntryContent {
 }
 
 /// Body of a [`MessageAppended`](crate::events::publish::MessageAppended) context:
-/// the text excerpt used by the segment-tree scorer.
+/// the adjacent text excerpts used by the segment-tree scorer.
 ///
 /// Stored in Redis by the publisher; resolved on the consumer side via
 /// [`ContextRef<MessageExcerpt>`](dynamic_message_extension::dynamic_context::ContextRef).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonMessageDe, JsonMessageSer)]
 pub struct MessageExcerpt {
+    /// Text of the prior message in the active chain, for scoring.
+    pub previous_excerpt: String,
     /// Text of the appended message, for scoring.
     pub current_excerpt: String,
 }

@@ -56,7 +56,7 @@ where
             .process(RecordMessage {
                 conversation_id: event.conversation_id,
                 message_id: event.message_id,
-                previous_excerpt: String::new(),
+                previous_excerpt: excerpt.previous_excerpt,
                 current_excerpt: excerpt.current_excerpt,
             })
             .await?;

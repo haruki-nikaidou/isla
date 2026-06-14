@@ -317,6 +317,19 @@ impl Processor<AppendMessageRequest> for ConversationService {
             .filter_map(|c| c.text.as_deref())
             .collect::<Vec<_>>()
             .join(" ");
+        let previous_excerpt = if let Some(before_id) = input.before {
+            self.database
+                .process(ListConversationContentByMessage {
+                    message_id: before_id,
+                })
+                .await?
+                .iter()
+                .filter_map(|c| c.text.as_deref())
+                .collect::<Vec<_>>()
+                .join(" ")
+        } else {
+            String::new()
+        };
         let conversation_id = input.conversation_id;
         let message_id = self
             .database
@@ -330,7 +343,10 @@ impl Processor<AppendMessageRequest> for ConversationService {
             .await?;
         let current_excerpt = ContextRef::store(
             &self.redis,
-            MessageExcerpt { current_excerpt: excerpt },
+            MessageExcerpt {
+                previous_excerpt,
+                current_excerpt: excerpt,
+            },
         )
         .await?;
         ContextRef::publish(
