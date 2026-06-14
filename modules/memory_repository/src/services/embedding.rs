@@ -134,6 +134,9 @@ where
 
     #[instrument(skip_all, name = "SearchMemory", err, fields(limit = input.limit))]
     async fn process(&self, input: SearchMemory) -> Result<Vec<EmbeddingHit>, Error> {
+        if input.limit <= 0 {
+            return Err(Error::InvalidInput);
+        }
         let query = self
             .embedder
             .process(EmbedRequest { text: input.query })
