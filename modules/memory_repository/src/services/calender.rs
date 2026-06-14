@@ -1,11 +1,13 @@
 //! Calendar service — CRUD for calendars, events, all-day events, tasks, and task dependencies.
 
+use std::sync::Arc;
+
+use dynamic_message_extension::cluster_authorized::ClusterMessageSender;
 use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::{Date, OffsetDateTime, PrimitiveDateTime};
 use tracing::instrument;
 use uuid::Uuid;
-use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -37,7 +39,7 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 #[derive(Clone)]
 pub struct CalenderService {
     pub database: DatabaseProcessor,
-    pub mq: AmqpPool,
+    pub sender: Arc<ClusterMessageSender>,
     pub redis: RedisPool,
 }
 
@@ -48,7 +50,7 @@ impl CalenderService {
         if let Some(e) = self.database.process(FindCalenderEventById { id }).await? {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryUpserted {
                     reference: EntryRef::calender_event(id),
                     privacy: e.privacy,
@@ -304,7 +306,7 @@ impl Processor<DeleteCalenderEventRequest> for CalenderService {
         if deleted {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryRemoved {
                     reference: EntryRef::calender_event(input.id),
                 },
@@ -338,7 +340,7 @@ impl Processor<UpdateCalenderEventPrivacyRequest> for CalenderService {
         if updated {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryPrivacyChanged {
                     reference: EntryRef::calender_event(input.id),
                     privacy: input.privacy,

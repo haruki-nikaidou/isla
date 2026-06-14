@@ -1,11 +1,13 @@
 //! Contact service — identities, platform contacts, and relationship stories.
 
+use std::sync::Arc;
+
+use dynamic_message_extension::cluster_authorized::ClusterMessageSender;
 use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
 use uuid::Uuid;
-use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -30,7 +32,7 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 #[derive(Clone)]
 pub struct ContactService {
     pub database: DatabaseProcessor,
-    pub mq: AmqpPool,
+    pub sender: Arc<ClusterMessageSender>,
     pub redis: RedisPool,
 }
 
@@ -45,7 +47,7 @@ impl ContactService {
         {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryUpserted {
                     reference: EntryRef::contact(id),
                     privacy: i.privacy,
@@ -193,7 +195,7 @@ impl Processor<UpdateContactIdentityPrivacyRequest> for ContactService {
         if updated {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryPrivacyChanged {
                     reference: EntryRef::contact(input.id),
                     privacy: input.privacy,
@@ -224,7 +226,7 @@ impl Processor<DeleteContactIdentityRequest> for ContactService {
         if deleted {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryRemoved {
                     reference: EntryRef::contact(input.id),
                 },

@@ -13,9 +13,14 @@
 //! ```
 //!
 //! [`ContextRef<T>`] mirrors the routing of `T`, so the exchange and routing key
-//! a consumer binds to are unchanged — only the wire body shrinks. Wrap an
-//! existing [`AmqpMessageProcessor<T>`] in [`ContextRefWrap`] to transparently
-//! resolve the pointer before the inner processor runs.
+//! a consumer binds to are unchanged — only the wire body shrinks.
+//!
+//! The pointer rides the *internal* cluster bus, so it is signed on the way out
+//! and verified on the way in like any other cluster message:
+//! [`ContextRef::publish`] sends through a [`ClusterMessageSender`], and
+//! [`verified_context_consumer`] fronts the pointer-resolving [`ContextRefWrap`]
+//! with a [`ClusterMessageHook`] so a delivery is authenticated before its body
+//! is ever fetched.
 
 use std::marker::PhantomData;
 use std::time::Duration;
@@ -25,11 +30,11 @@ use kanau::processor::Processor;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wakuwaku::Error;
-use wakuwaku::amqp::{
-    AmqpExchangeType, AmqpMessageProcessor, AmqpMessageSend, AmqpPool, AmqpRouting,
-};
+use wakuwaku::amqp::{AmqpExchangeType, AmqpMessageProcessor, AmqpMessageSend, AmqpRouting};
 use wakuwaku::pool::{Pool, Pooled, PoolingResult};
 use wakuwaku::redis::{KeyValue, KeyValueRead, KeyValueWrite, RedisConnection, RedisKey};
+
+use crate::cluster_authorized::{ClusterMessageHook, ClusterMessageSender, ClusterMessageVerifier};
 
 /// Pool of Redis connections backing the context store.
 pub type RedisPool = Pool<RedisConnection>;
@@ -158,12 +163,19 @@ impl<T> ContextRef<T>
 where
     T: AmqpRouting + Clone + MessageSer + MessageDe + Send + Sync,
 {
-    /// Park `body` in the Redis context store and publish a pointer to it.
+    /// Park `body` in the Redis context store and publish a signed pointer to
+    /// it on the cluster bus.
     ///
     /// Writes the body (with [`DEFAULT_CONTEXT_TTL`]) *before* sending, so the
-    /// pointer is never observable before the body it resolves. Returns the
-    /// generated `context_id` for tracing/correlation.
-    pub async fn publish(redis: &RedisPool, mq: &AmqpPool, body: T) -> Result<Uuid, Error> {
+    /// pointer is never observable before the body it resolves. The pointer is
+    /// sent through `sender`, so it carries a cluster signature that
+    /// [`verified_context_consumer`] checks on the way in. Returns the generated
+    /// `context_id` for tracing/correlation.
+    pub async fn publish(
+        redis: &RedisPool,
+        sender: &ClusterMessageSender,
+        body: T,
+    ) -> Result<Uuid, Error> {
         let context_id = Uuid::new_v4();
         {
             let mut pooled = acquire(redis).await?;
@@ -178,7 +190,7 @@ where
             )
             .await?;
         }
-        ContextRef::<T>::new(context_id).send(mq).await?;
+        sender.send(ContextRef::<T>::new(context_id)).await?;
         Ok(context_id)
     }
 }
@@ -235,6 +247,24 @@ where
             None => Err(Error::NotFound),
         }
     }
+}
+
+/// Build the full inbound stack for a cluster-internal `ContextRef<T>` consumer.
+///
+/// Fronts the pointer-resolving [`ContextRefWrap`] with a [`ClusterMessageHook`]:
+/// a delivery's cluster signature is verified *first*, and only an authenticated
+/// pointer is then resolved against `redis` and handed to `inner`. This is the
+/// counterpart to [`ContextRef::publish`], which signs on the way out.
+pub fn verified_context_consumer<T, P>(
+    inner: P,
+    redis: RedisPool,
+    verifier: ClusterMessageVerifier,
+) -> ClusterMessageHook<ContextRef<T>, ContextRefWrap<P>>
+where
+    T: AmqpMessageSend + Clone + MessageDe + Sync,
+    P: AmqpMessageProcessor<T> + Send + Sync,
+{
+    ClusterMessageHook::new(verifier, ContextRefWrap::new(inner, redis))
 }
 
 #[cfg(test)]

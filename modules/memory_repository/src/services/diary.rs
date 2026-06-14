@@ -1,10 +1,12 @@
 //! Diary service — CRUD for daily journal entries.
 
+use std::sync::Arc;
+
+use dynamic_message_extension::cluster_authorized::ClusterMessageSender;
 use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::Date;
 use tracing::instrument;
-use wakuwaku::amqp::AmqpPool;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
 use crate::entities::db::embedding::EntryRef;
@@ -20,7 +22,7 @@ use crate::events::publish::{EntryPrivacyChanged, EntryRemoved, EntryUpserted};
 #[derive(Clone)]
 pub struct DiaryService {
     pub database: DatabaseProcessor,
-    pub mq: AmqpPool,
+    pub sender: Arc<ClusterMessageSender>,
     pub redis: RedisPool,
 }
 
@@ -30,7 +32,7 @@ impl DiaryService {
         if let Some(d) = self.database.process(FindDiaryById { id }).await? {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryUpserted {
                     reference: EntryRef::diary(id),
                     privacy: d.privacy,
@@ -174,7 +176,7 @@ impl Processor<UpdateDiaryPrivacyRequest> for DiaryService {
         if updated {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryPrivacyChanged {
                     reference: EntryRef::diary(input.id),
                     privacy: input.privacy,
@@ -202,7 +204,7 @@ impl Processor<DeleteDiaryRequest> for DiaryService {
         if deleted {
             ContextRef::publish(
                 &self.redis,
-                &self.mq,
+                &self.sender,
                 EntryRemoved {
                     reference: EntryRef::diary(input.id),
                 },
