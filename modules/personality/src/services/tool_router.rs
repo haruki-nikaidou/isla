@@ -76,6 +76,7 @@ pub(crate) mod mock {
         type Output = serde_json::Value;
         type Error = Error;
 
+        #[instrument(skip_all, name = "ToolCall", err, ret)]
         async fn process(&self, _input: ToolCall) -> Result<serde_json::Value, Error> {
             Ok(self.response.clone())
         }
