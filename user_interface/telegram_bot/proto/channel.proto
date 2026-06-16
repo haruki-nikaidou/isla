@@ -1,0 +1,11 @@
+syntax = "proto3";
+package isla.interface.channel;
+
+service Channel {
+  rpc DeliverInbound(InboundMessage) returns (DeliverInboundResponse);
+  rpc Subscribe(SubscribeRequest) returns (stream OutboundMessage);
+}
+message InboundMessage { string platform = 1; string chat_id = 2; string user_id = 3; string text = 4; }
+message DeliverInboundResponse {}
+message SubscribeRequest { string platform = 1; }
+message OutboundMessage { string platform = 1; string chat_id = 2; string text = 3; }

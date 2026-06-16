@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Upsert the embedding row for a source entry identified by its product-of-\n-- nullable-FK reference (exactly one of $1..$4 is non-null). `IS NOT DISTINCT\n-- FROM` matches the single existing row for that reference (NULLs included)\n-- without needing a dynamic ON CONFLICT target.\nWITH updated AS (\n    UPDATE memory.embedding\n    SET privacy = $5, content = $6, embedding = $7, updated_at = $8\n    WHERE calender_event IS NOT DISTINCT FROM $1\n      AND conversation   IS NOT DISTINCT FROM $2\n      AND contact        IS NOT DISTINCT FROM $3\n      AND diary          IS NOT DISTINCT FROM $4\n    RETURNING id\n),\ninserted AS (\n    INSERT INTO memory.embedding\n        (calender_event, conversation, contact, diary, privacy, content, embedding, updated_at)\n    SELECT $1, $2, $3, $4, $5, $6, $7, $8\n    WHERE NOT EXISTS (SELECT 1 FROM updated)\n    ON CONFLICT DO NOTHING\n    RETURNING id\n)\nSELECT id AS \"id!\" FROM updated\nUNION ALL\nSELECT id AS \"id!\" FROM inserted\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Uuid",
+        "Int8",
+        {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        },
+        "Text",
+        {
+          "Custom": {
+            "name": "halfvec",
+            "kind": "Simple"
+          }
+        },
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "460bd6756af6cecebd833fd3b0e74a3041ae5c07f9478066708307e2d9c7cdbb"
+}

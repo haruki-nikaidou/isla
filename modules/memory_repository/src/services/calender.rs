@@ -243,7 +243,8 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
                 privacy: input.privacy,
             })
             .await?;
-        self.process(PublishCalenderEventUpsertRequest { id }).await?;
+        self.process(PublishCalenderEventUpsertRequest { id })
+            .await?;
         Ok(id)
     }
 }
@@ -302,7 +303,8 @@ impl Processor<UpdateCalenderEventRequest> for CalenderService {
             })
             .await?;
         if updated {
-            self.process(PublishCalenderEventUpsertRequest { id: input.id }).await?;
+            self.process(PublishCalenderEventUpsertRequest { id: input.id })
+                .await?;
         }
         Ok(updated)
     }

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO plugin_reg.plugin_tool\n                    (plugin_id, name, display_name, description, parameters_schema, routing_key)\n                VALUES ($1, $2, $3, $4, $5, $6)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "14a0e8463a8a3a1466e69051692901a9d2cb73db8f570906f1651a88fe6f1ede"
+}

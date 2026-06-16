@@ -1,0 +1,35 @@
+syntax = "proto3";
+package isla.interface.channel;
+
+// Unified channel surface used by every platform adapter (telegram_bot, …).
+//
+// An adapter pushes inbound user messages into the cluster with DeliverInbound,
+// and receives outbound messages addressed to its platform by holding a
+// Subscribe server-stream open.
+service Channel {
+  // Deliver one inbound user message from a platform adapter into the cluster.
+  rpc DeliverInbound(InboundMessage) returns (DeliverInboundResponse);
+  // Subscribe to the stream of outbound messages addressed to a platform.
+  rpc Subscribe(SubscribeRequest) returns (stream OutboundMessage);
+}
+
+// A message a user sent on some platform, normalized for the cluster.
+message InboundMessage {
+  string platform = 1;
+  string chat_id = 2;
+  string user_id = 3;
+  string text = 4;
+}
+
+message DeliverInboundResponse {}
+
+message SubscribeRequest {
+  string platform = 1;
+}
+
+// A message the cluster wants delivered back to a user on some platform.
+message OutboundMessage {
+  string platform = 1;
+  string chat_id = 2;
+  string text = 3;
+}

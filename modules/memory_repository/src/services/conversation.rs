@@ -113,7 +113,8 @@ impl Processor<CreateConversationRequest> for ConversationService {
                 privacy: input.privacy,
             })
             .await?;
-        self.process(PublishConversationUpsertRequest { id }).await?;
+        self.process(PublishConversationUpsertRequest { id })
+            .await?;
         Ok(id)
     }
 }
@@ -161,7 +162,8 @@ impl Processor<UpdateOpeningSummaryRequest> for ConversationService {
             })
             .await?;
         if updated {
-            self.process(PublishConversationUpsertRequest { id: input.id }).await?;
+            self.process(PublishConversationUpsertRequest { id: input.id })
+                .await?;
         }
         Ok(updated)
     }
@@ -213,7 +215,8 @@ impl Processor<CloseConversationRequest> for ConversationService {
             })
             .await?;
         if closed {
-            self.process(PublishConversationUpsertRequest { id: input.id }).await?;
+            self.process(PublishConversationUpsertRequest { id: input.id })
+                .await?;
         }
         Ok(closed)
     }

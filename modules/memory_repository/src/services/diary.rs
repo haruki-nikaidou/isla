@@ -168,7 +168,8 @@ impl Processor<UpdateDiaryRequest> for DiaryService {
             })
             .await?;
         if updated {
-            self.process(PublishDiaryUpsertRequest { id: input.id }).await?;
+            self.process(PublishDiaryUpsertRequest { id: input.id })
+                .await?;
         }
         Ok(updated)
     }

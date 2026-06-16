@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO plugin_reg.plugin_skill\n                    (plugin_id, name, display_name, description, main_file_text)\n                VALUES ($1, $2, $3, $4, $5)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "68de65f213e9f746c65c789887efc322174ca30b0a52029e0c0d68be789f20dc"
+}

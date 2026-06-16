@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO memory.conversation_message_metric\n                (message_id, semantic_distance, cumulative_distance)\n            SELECT\n                $1,\n                $2::smallint,\n                COALESCE(\n                    (\n                        SELECT MAX(m.cumulative_distance)\n                        FROM memory.conversation_message_metric m\n                        JOIN memory.conversation_message cm ON cm.id = m.message_id\n                        WHERE cm.conversation_id = (\n                            SELECT conversation_id\n                            FROM memory.conversation_message\n                            WHERE id = $1\n                        )\n                    ),\n                    0\n                ) + $2::bigint\n            RETURNING cumulative_distance\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cumulative_distance",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e9eea0ab99a7734085475dc2d99b1f705cebc8a1d0613d5689de640ae797f71a"
+}

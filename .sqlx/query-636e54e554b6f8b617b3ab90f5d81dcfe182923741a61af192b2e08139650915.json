@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO plugin_reg.plugin\n                (id, name, scope_range, description, jwt_secret,\n                 server_message_signature_key, message_exchange)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            RETURNING registered_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "registered_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "TextArray",
+        "Text",
+        "Text",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "636e54e554b6f8b617b3ab90f5d81dcfe182923741a61af192b2e08139650915"
+}

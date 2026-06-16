@@ -176,9 +176,9 @@ where
     /// a permanent condition that a redelivery cannot fix.
     pub async fn resolve(redis: &RedisPool, ptr: Self) -> Result<T, Error> {
         let mut pooled = acquire(redis).await?;
-        let conn = pooled.get_mut().ok_or_else(|| {
-            Error::Io(anyhow::anyhow!("Redis connection unexpectedly closed"))
-        })?;
+        let conn = pooled
+            .get_mut()
+            .ok_or_else(|| Error::Io(anyhow::anyhow!("Redis connection unexpectedly closed")))?;
         StoredContext::<T>::read(conn, context_key(ptr.context_id))
             .await?
             .ok_or(Error::NotFound)
@@ -198,9 +198,9 @@ where
     pub async fn store(redis: &RedisPool, body: T) -> Result<Self, Error> {
         let context_id = Uuid::new_v4();
         let mut pooled = acquire(redis).await?;
-        let conn = pooled.get_mut().ok_or_else(|| {
-            Error::Io(anyhow::anyhow!("Redis connection unexpectedly closed"))
-        })?;
+        let conn = pooled
+            .get_mut()
+            .ok_or_else(|| Error::Io(anyhow::anyhow!("Redis connection unexpectedly closed")))?;
         StoredContext::<T>::write_kv_with_ttl(
             conn,
             context_key(context_id),
@@ -219,7 +219,7 @@ where
     /// Park `body` in the Redis context store and publish a signed pointer to
     /// it on the cluster bus.
     ///
-    /// Writes the body (with [`DEFAULT_CONTEXT_TTL`]) *before* sending, so the
+    /// Writes the body (with a default TTL) *before* sending, so the
     /// pointer is never observable before the body it resolves. The pointer is
     /// sent through `sender`, so it carries a cluster signature that
     /// [`verified_context_consumer`] checks on the way in. Returns the generated

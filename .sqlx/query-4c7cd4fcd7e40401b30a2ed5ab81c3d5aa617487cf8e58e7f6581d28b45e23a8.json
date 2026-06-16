@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, name, registered_at, scope_range, description, jwt_secret,\n                   server_message_signature_key, message_exchange\n            FROM plugin_reg.plugin\n            ORDER BY registered_at DESC\n            LIMIT $1 OFFSET $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "registered_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "scope_range",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "jwt_secret",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "server_message_signature_key",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 7,
+        "name": "message_exchange",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4c7cd4fcd7e40401b30a2ed5ab81c3d5aa617487cf8e58e7f6581d28b45e23a8"
+}

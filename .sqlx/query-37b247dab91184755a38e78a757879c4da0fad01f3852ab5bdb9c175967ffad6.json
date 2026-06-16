@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO plugin_reg.plugin_dependency\n                    (plugin_id, require_plugin, require_version)\n                VALUES ($1, $2, $3)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "37b247dab91184755a38e78a757879c4da0fad01f3852ab5bdb9c175967ffad6"
+}
