@@ -1,9 +1,14 @@
 //! Conversation service — lifecycle management, message appending, and content retrieval.
 
+use std::sync::Arc;
+
+use dynamic_message_extension::cluster_authorized::ClusterMessageSender;
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use tracing::instrument;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     conversation::{
@@ -21,10 +26,57 @@ use crate::entities::db::{
         SetConversationMessageBranch,
     },
 };
+use crate::entities::redis::{EntryContent, MessageExcerpt};
+use crate::events::publish::{EntryUpserted, MessageAppended};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ConversationService {
     pub database: DatabaseProcessor,
+    pub sender: Arc<ClusterMessageSender>,
+    pub redis: RedisPool,
+}
+
+/// Publish an [`EntryUpserted`] for a conversation so the RAG index
+/// (re)embeds it from its summaries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublishConversationUpsertRequest {
+    pub id: i64,
+}
+
+impl Processor<PublishConversationUpsertRequest> for ConversationService {
+    type Output = ();
+    type Error = Error;
+
+    #[instrument(skip_all, name = "PublishConversationUpsertRequest", err, fields(id = input.id))]
+    async fn process(&self, input: PublishConversationUpsertRequest) -> Result<(), Error> {
+        let id = input.id;
+        if let Some(c) = self.database.process(FindConversationById { id }).await? {
+            let text = match c.closing_summary {
+                Some(closing) => format!("{}\n{}", c.opening_summary, closing),
+                None => c.opening_summary,
+            };
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::conversation(id),
+                    privacy: c.privacy,
+                    content: text,
+                },
+            )
+            .await?;
+            ContextRef::publish(
+                &self.redis,
+                &self.sender,
+                EntryUpserted {
+                    reference: EntryRef::conversation(id),
+                    privacy: c.privacy,
+                    content,
+                },
+            )
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 /// Returns the current Unix timestamp in seconds.
@@ -52,7 +104,7 @@ impl Processor<CreateConversationRequest> for ConversationService {
     #[instrument(skip_all, name = "CreateConversationRequest", err)]
     async fn process(&self, input: CreateConversationRequest) -> Result<i64, Error> {
         let ts = now_unix();
-        Ok(self
+        let id = self
             .database
             .process(CreateConversation {
                 opening_summary: input.opening_summary,
@@ -60,7 +112,9 @@ impl Processor<CreateConversationRequest> for ConversationService {
                 updated_at: ts,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        self.process(PublishConversationUpsertRequest { id }).await?;
+        Ok(id)
     }
 }
 
@@ -99,13 +153,17 @@ impl Processor<UpdateOpeningSummaryRequest> for ConversationService {
 
     #[instrument(skip_all, name = "UpdateOpeningSummaryRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateOpeningSummaryRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateConversationOpeningSummary {
                 id: input.id,
                 opening_summary: input.opening_summary,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.process(PublishConversationUpsertRequest { id: input.id }).await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -122,13 +180,14 @@ impl Processor<UpdateConversationPrivacyRequest> for ConversationService {
 
     #[instrument(skip_all, name = "UpdateConversationPrivacyRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateConversationPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateConversationPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        Ok(updated)
     }
 }
 
@@ -145,14 +204,18 @@ impl Processor<CloseConversationRequest> for ConversationService {
 
     #[instrument(skip_all, name = "CloseConversationRequest", err, fields(id = input.id))]
     async fn process(&self, input: CloseConversationRequest) -> Result<bool, Error> {
-        Ok(self
+        let closed = self
             .database
             .process(CloseConversation {
                 id: input.id,
                 closing_summary: input.closing_summary,
                 updated_at: now_unix(),
             })
-            .await?)
+            .await?;
+        if closed {
+            self.process(PublishConversationUpsertRequest { id: input.id }).await?;
+        }
+        Ok(closed)
     }
 }
 
@@ -190,10 +253,11 @@ impl Processor<DeleteConversationRequest> for ConversationService {
 
     #[instrument(skip_all, name = "DeleteConversationRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteConversationRequest) -> Result<bool, Error> {
-        Ok(self
+        let deleted = self
             .database
             .process(DeleteConversation { id: input.id })
-            .await?)
+            .await?;
+        Ok(deleted)
     }
 }
 
@@ -245,16 +309,57 @@ impl Processor<AppendMessageRequest> for ConversationService {
     #[instrument(skip_all, name = "AppendMessageRequest", err,
         fields(conversation_id = input.conversation_id))]
     async fn process(&self, input: AppendMessageRequest) -> Result<i64, Error> {
-        Ok(self
+        // Excerpt the new message's text up front so the segment-tree scorer
+        // (run async by a hook) needn't reload it.
+        let excerpt: String = input
+            .contents
+            .iter()
+            .filter_map(|c| c.text.as_deref())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let previous_excerpt = if let Some(before_id) = input.before {
+            self.database
+                .process(ListConversationContentByMessage {
+                    message_id: before_id,
+                })
+                .await?
+                .iter()
+                .filter_map(|c| c.text.as_deref())
+                .collect::<Vec<_>>()
+                .join(" ")
+        } else {
+            String::new()
+        };
+        let conversation_id = input.conversation_id;
+        let message_id = self
             .database
             .process(AppendMessageTx {
-                conversation_id: input.conversation_id,
+                conversation_id,
                 before: input.before,
                 role: input.role,
                 contents: input.contents,
                 conversation_updated_at: now_unix(),
             })
-            .await?)
+            .await?;
+        let current_excerpt = ContextRef::store(
+            &self.redis,
+            MessageExcerpt {
+                previous_excerpt,
+                current_excerpt: excerpt,
+            },
+        )
+        .await?;
+        ContextRef::publish(
+            &self.redis,
+            &self.sender,
+            MessageAppended {
+                conversation_id,
+                message_id,
+                current_excerpt,
+            },
+        )
+        .await?;
+        Ok(message_id)
     }
 }
 

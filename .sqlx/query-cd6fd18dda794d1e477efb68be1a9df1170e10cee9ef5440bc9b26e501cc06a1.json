@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Nearest embeddings to a query vector ($1) by cosine distance, restricted to\n-- the audience-allowed privacy levels ($2), limited to $3 rows. Returns the\n-- source reference so callers can resolve the underlying memory entry.\nSELECT\n    id,\n    calender_event,\n    conversation,\n    contact,\n    diary,\n    privacy AS \"privacy: PrivacyControlFlag\",\n    content,\n    (embedding <=> $1) AS \"distance!\"\nFROM memory.embedding\nWHERE embedding IS NOT NULL\n  AND privacy = ANY($2)\nORDER BY embedding <=> $1\nLIMIT $3\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "calender_event",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "conversation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "contact",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "diary",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "privacy: PrivacyControlFlag",
+        "type_info": {
+          "Custom": {
+            "name": "memory.privacy_control",
+            "kind": {
+              "Enum": [
+                "Private",
+                "Protected",
+                "Public"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "distance!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "halfvec",
+            "kind": "Simple"
+          }
+        },
+        {
+          "Custom": {
+            "name": "memory.privacy_control[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "memory.privacy_control",
+                  "kind": {
+                    "Enum": [
+                      "Private",
+                      "Protected",
+                      "Public"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "cd6fd18dda794d1e477efb68be1a9df1170e10cee9ef5440bc9b26e501cc06a1"
+}

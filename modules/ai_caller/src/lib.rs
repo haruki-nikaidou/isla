@@ -1,17 +1,17 @@
 //! # `ai_caller` module
 //!
-//! Calls into upstream LLM APIs and dispatches tool use.
+//! Calls into upstream LLM APIs.
 //!
 //! Responsibilities:
 //!
 //! - Build provider-specific requests (OpenAI-compatible, Anthropic, …) from
-//!   a normalized internal representation.
-//! - Stream responses back to the conversation owner.
-//! - When the model emits a tool call, route it to the appropriate handler:
-//!   either an internal handler in another module (for example, "send
-//!   message" lives in `interface`) or an external plugin reached via
-//!   `plugin_registrar` over AMQP.
+//!   the normalized internal representation in [`model`], and parse the vendor
+//!   response back into it.
+//! - Stream responses back to the caller.
 //! - Pull API credentials from `vault` rather than holding them itself.
+//!
+//! Deciding *what* to send (personality + memory) and routing the model's tool
+//! calls live in the `personality` module, which depends on this one.
 //!
 //! ## Status
 //!
@@ -24,6 +24,7 @@ pub mod config;
 pub mod entities;
 pub mod events;
 pub mod hooks;
+pub mod model;
 pub mod rpc;
 pub mod services;
 mod utils;

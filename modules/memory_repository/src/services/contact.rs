@@ -1,11 +1,16 @@
 //! Contact service — identities, platform contacts, and relationship stories.
 
+use std::sync::Arc;
+
+use dynamic_message_extension::cluster_authorized::ClusterMessageSender;
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::PrimitiveDateTime;
 use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     contact::{
@@ -22,10 +27,60 @@ use crate::entities::db::{
         ListContactStoriesByIdentity, StoryType, UpdateContactStory, UpdateContactStoryPrivacy,
     },
 };
+use crate::entities::redis::EntryContent;
+use crate::events::publish::EntryUpserted;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ContactService {
     pub database: DatabaseProcessor,
+    pub sender: Arc<ClusterMessageSender>,
+    pub redis: RedisPool,
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Publish an [`EntryUpserted`] for a contact identity so the RAG index
+/// (re)embeds it.
+pub struct PublishIdentityUpsertRequest {
+    pub id: Uuid,
+}
+
+impl Processor<PublishIdentityUpsertRequest> for ContactService {
+    type Output = ();
+    type Error = Error;
+    #[instrument(skip_all, err, name = "PublishIdentityUpsert")]
+    async fn process(
+        &self,
+        input: PublishIdentityUpsertRequest,
+    ) -> Result<Self::Output, Self::Error> {
+        let id = input.id;
+        if let Some(i) = self
+            .database
+            .process(FindContactIdentityById { id })
+            .await?
+        {
+            let text = format!("{}\n{}", i.identify_name, i.description);
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::contact(id),
+                    privacy: i.privacy,
+                    content: text,
+                },
+            )
+            .await?;
+            ContextRef::publish(
+                &self.redis,
+                &self.sender,
+                EntryUpserted {
+                    reference: EntryRef::contact(id),
+                    privacy: i.privacy,
+                    content,
+                },
+            )
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 // ─── Identity CRUD ────────────────────────────────────────────────────────────
@@ -58,6 +113,7 @@ impl Processor<CreateContactIdentityRequest> for ContactService {
                 privacy: input.privacy,
             })
             .await?;
+        self.process(PublishIdentityUpsertRequest { id }).await?;
         Ok(id)
     }
 }
@@ -101,14 +157,19 @@ impl Processor<UpdateContactIdentityRequest> for ContactService {
         if input.identify_name.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let updated = self
             .database
             .process(UpdateContactIdentity {
                 id: input.id,
                 identify_name: input.identify_name,
                 description: input.description,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.process(PublishIdentityUpsertRequest { id: input.id })
+                .await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -148,13 +209,14 @@ impl Processor<UpdateContactIdentityPrivacyRequest> for ContactService {
 
     #[instrument(skip_all, name = "UpdateContactIdentityPrivacyRequest", err, fields(id = %input.id))]
     async fn process(&self, input: UpdateContactIdentityPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateContactIdentityPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        Ok(updated)
     }
 }
 
@@ -170,10 +232,11 @@ impl Processor<DeleteContactIdentityRequest> for ContactService {
 
     #[instrument(skip_all, name = "DeleteContactIdentityRequest", err, fields(id = %input.id))]
     async fn process(&self, input: DeleteContactIdentityRequest) -> Result<bool, Error> {
-        Ok(self
+        let deleted = self
             .database
             .process(DeleteContactIdentity { id: input.id })
-            .await?)
+            .await?;
+        Ok(deleted)
     }
 }
 

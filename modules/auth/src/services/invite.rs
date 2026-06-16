@@ -207,9 +207,7 @@ impl Processor<CreateInviteRequest> for InviteService {
         // load the inviting account to determine its privileges
         let account = self
             .db
-            .process(FindAccountById {
-                id: input.user_id,
-            })
+            .process(FindAccountById { id: input.user_id })
             .await?
             .ok_or(wakuwaku::Error::NotFound)?;
 

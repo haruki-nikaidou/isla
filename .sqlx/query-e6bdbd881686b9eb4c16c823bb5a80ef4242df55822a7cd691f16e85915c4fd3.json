@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- How many raw messages currently fall in a level-1 node's cumulative-distance\n-- span [$2, $3). These are the node's children; comparing this against the\n-- node's `last_summary_children` tells the read path whether its summary is\n-- stale (the count can only grow, since history is append-only).\nSELECT COUNT(*) AS \"count!\"\nFROM memory.conversation_message cm\nJOIN memory.conversation_message_metric m ON m.message_id = cm.id\nWHERE cm.conversation_id = $1\n  AND m.cumulative_distance >= $2\n  AND m.cumulative_distance < $3\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e6bdbd881686b9eb4c16c823bb5a80ef4242df55822a7cd691f16e85915c4fd3"
+}

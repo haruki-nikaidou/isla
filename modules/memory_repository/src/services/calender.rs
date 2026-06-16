@@ -1,11 +1,16 @@
 //! Calendar service — CRUD for calendars, events, all-day events, tasks, and task dependencies.
 
+use std::sync::Arc;
+
+use dynamic_message_extension::cluster_authorized::ClusterMessageSender;
+use dynamic_message_extension::dynamic_context::{ContextRef, RedisPool};
 use kanau::processor::Processor;
 use time::{Date, OffsetDateTime, PrimitiveDateTime};
 use tracing::instrument;
 use uuid::Uuid;
 use wakuwaku::{Error, sqlx::DatabaseProcessor};
 
+use crate::entities::db::embedding::EntryRef;
 use crate::entities::db::{
     PrivacyControlFlag,
     calender::{
@@ -29,10 +34,54 @@ use crate::entities::db::{
         UpdateCalenderTask, UpdateCalenderTaskPrivacy, UpdateCalenderTaskStatus,
     },
 };
+use crate::entities::redis::EntryContent;
+use crate::events::publish::EntryUpserted;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CalenderService {
     pub database: DatabaseProcessor,
+    pub sender: Arc<ClusterMessageSender>,
+    pub redis: RedisPool,
+}
+
+/// Publish an [`EntryUpserted`] for a calendar event so the RAG index
+/// (re)embeds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublishCalenderEventUpsertRequest {
+    pub id: i64,
+}
+
+impl Processor<PublishCalenderEventUpsertRequest> for CalenderService {
+    type Output = ();
+    type Error = Error;
+
+    #[instrument(skip_all, name = "PublishCalenderEventUpsertRequest", err, fields(id = input.id))]
+    async fn process(&self, input: PublishCalenderEventUpsertRequest) -> Result<(), Error> {
+        let id = input.id;
+        if let Some(e) = self.database.process(FindCalenderEventById { id }).await? {
+            let text = format!("{}\n{}", e.title, e.description);
+            let content = ContextRef::store(
+                &self.redis,
+                EntryContent {
+                    reference: EntryRef::calender_event(id),
+                    privacy: e.privacy,
+                    content: text,
+                },
+            )
+            .await?;
+            ContextRef::publish(
+                &self.redis,
+                &self.sender,
+                EntryUpserted {
+                    reference: EntryRef::calender_event(id),
+                    privacy: e.privacy,
+                    content,
+                },
+            )
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 // ─── Calendar CRUD ────────────────────────────────────────────────────────────
@@ -182,7 +231,7 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
         if input.title.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let id = self
             .database
             .process(CreateCalenderEvent {
                 calendar_id: input.calendar_id,
@@ -193,7 +242,9 @@ impl Processor<CreateCalenderEventRequest> for CalenderService {
                 repeat_until: input.repeat_until,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        self.process(PublishCalenderEventUpsertRequest { id }).await?;
+        Ok(id)
     }
 }
 
@@ -239,7 +290,7 @@ impl Processor<UpdateCalenderEventRequest> for CalenderService {
         if input.title.trim().is_empty() {
             return Err(Error::InvalidInput);
         }
-        Ok(self
+        let updated = self
             .database
             .process(UpdateCalenderEvent {
                 id: input.id,
@@ -249,7 +300,11 @@ impl Processor<UpdateCalenderEventRequest> for CalenderService {
                 repeat: input.repeat,
                 repeat_until: input.repeat_until,
             })
-            .await?)
+            .await?;
+        if updated {
+            self.process(PublishCalenderEventUpsertRequest { id: input.id }).await?;
+        }
+        Ok(updated)
     }
 }
 
@@ -265,10 +320,11 @@ impl Processor<DeleteCalenderEventRequest> for CalenderService {
 
     #[instrument(skip_all, name = "DeleteCalenderEventRequest", err, fields(id = input.id))]
     async fn process(&self, input: DeleteCalenderEventRequest) -> Result<bool, Error> {
-        Ok(self
+        let deleted = self
             .database
             .process(DeleteCalenderEvent { id: input.id })
-            .await?)
+            .await?;
+        Ok(deleted)
     }
 }
 
@@ -285,13 +341,14 @@ impl Processor<UpdateCalenderEventPrivacyRequest> for CalenderService {
 
     #[instrument(skip_all, name = "UpdateCalenderEventPrivacyRequest", err, fields(id = input.id))]
     async fn process(&self, input: UpdateCalenderEventPrivacyRequest) -> Result<bool, Error> {
-        Ok(self
+        let updated = self
             .database
             .process(UpdateCalenderEventPrivacy {
                 id: input.id,
                 privacy: input.privacy,
             })
-            .await?)
+            .await?;
+        Ok(updated)
     }
 }
 

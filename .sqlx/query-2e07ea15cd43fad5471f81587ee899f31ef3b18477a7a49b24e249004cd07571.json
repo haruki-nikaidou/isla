@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- How many child nodes (level $2 - 1) currently fall inside a node's\n-- cumulative-distance span [$3, $4). These are a higher-level node's children;\n-- comparing this against its `last_summary_children` tells the read path whether\n-- its summary is stale.\nSELECT COUNT(*) AS \"count!\"\nFROM memory.conversation_summary_node\nWHERE conversation_id = $1\n  AND level = $2 - 1\n  AND distance_from >= $3\n  AND distance_to   <= $4\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2e07ea15cd43fad5471f81587ee899f31ef3b18477a7a49b24e249004cd07571"
+}

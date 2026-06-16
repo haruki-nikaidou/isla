@@ -189,7 +189,9 @@ impl Account for AccountGrpcService {
         let caller = caller(&request)?;
         let pb::InvalidateInviteRequest { token } = request.into_inner();
         let Ok(token) = Uuid::parse_str(&token) else {
-            return Ok(Response::new(pb::InvalidateInviteResponse { success: false }));
+            return Ok(Response::new(pb::InvalidateInviteResponse {
+                success: false,
+            }));
         };
         let result = self
             .invite_service

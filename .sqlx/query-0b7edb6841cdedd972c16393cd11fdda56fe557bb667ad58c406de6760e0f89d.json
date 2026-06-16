@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Register a segment-tree node whose bucket just became full, *without*\n-- summarizing it. Summarization is deferred (lazy): the read-path saga refreshes\n-- the node on demand. Here we only record that the node exists -- with an empty\n-- summary and a zero child watermark, so the read path sees it as stale and\n-- knows to refresh it before use. A no-op if the node already exists, so an\n-- already-summarized node is never clobbered back to a placeholder.\nINSERT INTO memory.conversation_summary_node\n    (conversation_id, level, bucket, covers_from_message_id, covers_to_message_id,\n     distance_from, distance_to, summary, is_open, last_summary_children, updated_at)\nVALUES ($1, $2, $3, $4, $5, $6, $7, '', FALSE, 0, $8)\nON CONFLICT (conversation_id, level, bucket) DO NOTHING\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0b7edb6841cdedd972c16393cd11fdda56fe557bb667ad58c406de6760e0f89d"
+}

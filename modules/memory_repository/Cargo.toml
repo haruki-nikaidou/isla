@@ -9,7 +9,15 @@ sqlx.workspace = true
 time.workspace = true
 rand.workspace = true
 wakuwaku.workspace = true
+dynamic_message_extension = { path = "../../libs/dynamic_message_extension" }
 kanau.workspace = true
 rkyv.workspace = true
 redis.workspace = true
+pgvector.workspace = true
 tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

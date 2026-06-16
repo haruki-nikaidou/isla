@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- The largest cumulative semantic distance recorded for a conversation, or 0\n-- when it has no scored messages yet. Used to compute the next message's\n-- cumulative position on the segment-tree axis.\nSELECT COALESCE(MAX(m.cumulative_distance), 0) AS \"cumulative!\"\nFROM memory.conversation_message_metric m\nJOIN memory.conversation_message cm ON cm.id = m.message_id\nWHERE cm.conversation_id = $1\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cumulative!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1ae0583e9fe6bedd59027e4138c96801d7901f52caf174ecac7d8cecf4836404"
+}

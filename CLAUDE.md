@@ -94,3 +94,11 @@ This is a Cargo workspace. Use standard commands:
 
 Isolate pure algorithms from IO so they can be tested, and focus tests on logic
 complex enough to be wrong.
+
+**Tests may only exercise pure functions — never the database.** No live DB, no
+`#[sqlx::test]`, no test containers. When a processor that touches
+`DatabaseProcessor` holds non-trivial logic, extract that logic into a pure
+function (inputs in, value out, no IO) and test that; leave the thin DB plumbing
+untested. For example, the summary read-path saga keeps `select_context` and
+`resolve_context` pure and tested, while `SummaryService::process` just wires the
+database around them.

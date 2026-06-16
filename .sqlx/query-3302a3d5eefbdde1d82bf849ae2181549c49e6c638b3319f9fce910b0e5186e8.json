@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- The first and last message id whose cumulative semantic distance falls in\n-- [$2, $3) for a conversation, or (0, 0) when the range is empty. Used to stamp\n-- a newly-full segment-tree node's covered-message markers cheaply, without\n-- loading any message text.\nSELECT\n    COALESCE(MIN(cm.id), 0) AS \"from_id!\",\n    COALESCE(MAX(cm.id), 0) AS \"to_id!\"\nFROM memory.conversation_message cm\nJOIN memory.conversation_message_metric m ON m.message_id = cm.id\nWHERE cm.conversation_id = $1\n  AND m.cumulative_distance >= $2\n  AND m.cumulative_distance < $3\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "from_id!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "to_id!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "3302a3d5eefbdde1d82bf849ae2181549c49e6c638b3319f9fce910b0e5186e8"
+}
