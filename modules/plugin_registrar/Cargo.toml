@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+dynamic_message_extension = { path = "../../libs/dynamic_message_extension" }
 uuid.workspace = true
 sqlx.workspace = true
 time.workspace = true

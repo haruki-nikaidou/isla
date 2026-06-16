@@ -5,4 +5,7 @@
 //! dependencies), de-registering, dependency-resolution checks, and routing
 //! lookups used by the rest of the cluster.
 //!
-//! Currently empty — to be implemented as the module exits pre-alpha.
+//! Registration, de-registration, namespace routing, and tool-catalog lookups
+//! are exposed through [`registrar`].
+
+pub mod registrar;

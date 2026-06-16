@@ -18,7 +18,16 @@
 //!
 //! ## Status
 //!
-//! Pre-alpha. Nothing implemented yet.
+//! Pre-alpha. The channel surface (gRPC + AMQP events + the `send_message`
+//! tool) is implemented; a worker in `binary/server` is expected to host the
+//! [`ChannelGrpcService`](rpc::channel::ChannelGrpcService) and run the
+//! [`OutboundDeliveryHook`](hooks::OutboundDeliveryHook) consumer.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+pub mod events;
+pub mod hooks;
+pub mod proto;
+pub mod rpc;
+pub mod services;

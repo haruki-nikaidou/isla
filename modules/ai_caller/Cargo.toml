@@ -11,6 +11,9 @@ serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 anyhow.workspace = true
+vault = { path = "../vault" }
+openrouter-rs.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

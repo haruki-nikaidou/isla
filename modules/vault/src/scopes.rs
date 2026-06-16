@@ -167,6 +167,10 @@ pub const OBJECT_STORAGE_SCOPE: Scope = Scope(&["@isla", "memory_repository", "o
 
 pub const AUTH_SCOPE: Scope = Scope(&["@isla", "auth"]);
 
+/// Scope for the `ai_caller` module's upstream-LLM credentials and config
+/// (e.g. the OpenRouter API key and model selection).
+pub const AI_CALLER_SCOPE: Scope = Scope(&["@isla", "ai_caller"]);
+
 #[cfg(test)]
 mod tests {
     use super::*;

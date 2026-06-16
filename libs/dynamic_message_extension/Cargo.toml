@@ -12,5 +12,6 @@ kanau.workspace = true
 amqprs.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+jsonwebtoken.workspace = true
 ring = "0.17"
 sha2 = "0.11"
