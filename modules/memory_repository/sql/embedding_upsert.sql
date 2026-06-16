@@ -16,6 +16,7 @@ inserted AS (
         (calender_event, conversation, contact, diary, privacy, content, embedding, updated_at)
     SELECT $1, $2, $3, $4, $5, $6, $7, $8
     WHERE NOT EXISTS (SELECT 1 FROM updated)
+    ON CONFLICT DO NOTHING
     RETURNING id
 )
 SELECT id AS "id!" FROM updated
