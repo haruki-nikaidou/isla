@@ -31,3 +31,4 @@ pub mod hooks;
 pub mod proto;
 pub mod rpc;
 pub mod services;
+pub mod entities;
