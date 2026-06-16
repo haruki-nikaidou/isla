@@ -47,6 +47,7 @@ pub struct PublishIdentityUpsertRequest {
 impl Processor<PublishIdentityUpsertRequest> for ContactService {
     type Output = ();
     type Error = Error;
+    #[instrument(skip_all, err, name = "PublishIdentityUpsert")]
     async fn process(
         &self,
         input: PublishIdentityUpsertRequest,
