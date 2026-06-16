@@ -22,19 +22,31 @@ than a single megabinary.
 
 ### Transport summary
 
-| Traffic                        | Transport       | Payload  |
-| ------------------------------ | --------------- | -------- |
-| Intra-cluster module-to-module | RabbitMQ (AMQP) | JSON     |
-| `webui` ↔ `interface` module   | gRPC            | Protobuf |
-| `dashboard` ↔ most modules     | gRPC            | Protobuf |
-| Plugin ↔ cluster               | RabbitMQ (AMQP) | JSON     |
-| Persistent state               | PostgreSQL      | —        |
-| Caches / ephemeral state       | Redis           | —        |
+| Traffic                                          | Transport       | Payload               |
+| ------------------------------------------------ | --------------- | --------------------- |
+| Intra-cluster module-to-module                   | RabbitMQ (AMQP) | JSON                  |
+| Channel adapter (e.g. `telegram_bot`) ↔ cluster  | RabbitMQ (AMQP) | JSON (cluster-signed) |
+| `webui` ↔ `interface` module                     | gRPC            | Protobuf              |
+| `dashboard` ↔ most modules                       | gRPC            | Protobuf              |
+| Plugin ↔ cluster                                 | RabbitMQ (AMQP) | JSON                  |
+| Persistent state                                 | PostgreSQL      | —                     |
+| Caches / ephemeral state                         | Redis           | —                     |
 
-gRPC is reserved for in-cluster user-to-service calls (including the first-party
-`webui` and `dashboard`). Plugins and modules always talk to the cluster via
-JSON over RabbitMQ, so a plugin can be written in any language and hosted
-anywhere the broker is reachable.
+gRPC is reserved for user-facing clients that cannot join the message bus
+directly: the first-party `webui` reaches the cluster through the `interface`
+module's gRPC API, and `dashboard` talks to most modules over gRPC.
+
+Every other user-facing channel adapter (such as `user_interface/telegram_bot`)
+is a trusted first-party cluster node, so it talks to the cluster directly over
+RabbitMQ and signs each message as a cluster message — Ed25519 over the SHA-256
+digest, carried in the `X-Cluster-Signature` header (see
+`libs/dynamic_message_extension`, `ClusterMessage`). The `webui` is the
+exception: as a browser client it cannot hold the cluster signing key, so it
+talks to the `interface` module over gRPC instead.
+
+Plugins also reach the cluster over RabbitMQ, but as untrusted senders
+authenticated with per-plugin JWTs rather than the cluster key, so a plugin can
+be written in any language and hosted anywhere the broker is reachable.
 
 ## Repository layout
 

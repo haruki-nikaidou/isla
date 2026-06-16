@@ -62,19 +62,32 @@ of contracts, messaging patterns, and observability tooling.
 
 ### Transport summary
 
-| Traffic                        | Transport            | Payload |
-| ------------------------------ | -------------------- | ------- |
-| Intra-cluster module-to-module | RabbitMQ             | JSON    |
-| `webui` ↔ `interface` module   | gRPC                 | Protobuf |
-| `dashboard` ↔ most modules     | gRPC                 | Protobuf |
-| Plugin ↔ cluster               | RabbitMQ (AMQP)      | JSON    |
-| Persistent state               | PostgreSQL           | —       |
-| Caches / ephemeral state       | Redis                | —       |
+| Traffic                                          | Transport            | Payload               |
+| ------------------------------------------------ | -------------------- | --------------------- |
+| Intra-cluster module-to-module                   | RabbitMQ             | JSON                  |
+| Channel adapter (e.g. `telegram_bot`) ↔ cluster  | RabbitMQ (AMQP)      | JSON (cluster-signed) |
+| `webui` ↔ `interface` module                     | gRPC                 | Protobuf              |
+| `dashboard` ↔ most modules                       | gRPC                 | Protobuf              |
+| Plugin ↔ cluster                                 | RabbitMQ (AMQP)      | JSON                  |
+| Persistent state                                 | PostgreSQL           | —                     |
+| Caches / ephemeral state                         | Redis                | —                     |
 
-The gRPC stack is reserved for in-cluster user-to-service calls (including
-the first-party `webui` and `dashboard`). Plugins and modules always talk to the cluster
-via JSON messages over RabbitMQ, so that a plugin can be implemented in any
-programming language and hosted anywhere the broker is reachable.
+The gRPC stack is reserved for user-facing clients that cannot join the message
+bus directly: the first-party `webui` reaches the cluster through the
+`interface` module's gRPC API, and `dashboard` talks to most modules over gRPC.
+
+Every other user-facing channel adapter (such as `user_interface/telegram_bot`)
+is a trusted first-party cluster node, so it talks to the cluster directly over
+RabbitMQ and signs each message as a cluster message (Ed25519 over the SHA-256
+digest, carried in the `X-Cluster-Signature` header; see
+`libs/dynamic_message_extension`). The `webui` is the exception — as a browser
+client it cannot hold the cluster signing key, so it talks to the `interface`
+module over gRPC instead.
+
+Plugins also reach the cluster over RabbitMQ, but as untrusted senders
+authenticated with per-plugin JWTs rather than the cluster key, so that a plugin
+can be implemented in any programming language and hosted anywhere the broker is
+reachable.
 
 ### Service topology
 
@@ -105,7 +118,7 @@ removed entirely):
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `webui/`                      | Default end-user chat UI. Talks to the `interface` module over gRPC.                                                  |
 | `dashboard/`                  | Default admin/ops UI. Talks to most modules over gRPC (this is why every module exposes an `rpc` submodule).          |
-| `user_interface/telegram_bot` | First-party Telegram adapter. Other chat platforms (Discord, Slack, …) are added the same way.                       |
+| `user_interface/telegram_bot` | First-party Telegram adapter. As a trusted cluster node it talks to the cluster over RabbitMQ, signing each message as a cluster message. Other chat platforms (Discord, Slack, …) are added the same way. |
 
 These frontends are *not* plugins — they don't provide skills or tools.
 "Send a message" tooling is part of the `interface` module itself.
