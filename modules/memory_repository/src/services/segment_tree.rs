@@ -198,21 +198,14 @@ where
             .await?
             .clamp(1, 25);
 
-        let cum_prev = self
+        let cum_new = self
             .database
-            .process(LatestCumulativeDistance {
-                conversation_id: input.conversation_id,
-            })
-            .await?;
-        let cum_new = cum_prev + i64::from(score);
-
-        self.database
             .process(CreateConversationMessageMetric {
                 message_id: input.message_id,
-                semantic_distance: score,
-                cumulative_distance: cum_new,
+                score,
             })
             .await?;
+        let cum_prev = cum_new - i64::from(score);
 
         // Register the now-full nodes as placeholders so the read-path saga can
         // discover and summarize them on demand. Cheap inserts only — no LLM.

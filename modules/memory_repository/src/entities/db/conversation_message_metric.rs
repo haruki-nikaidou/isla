@@ -25,30 +25,43 @@ pub struct ConversationMessageMetricEntity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CreateConversationMessageMetric {
     pub message_id: i64,
-    pub semantic_distance: i16,
-    pub cumulative_distance: i64,
+    pub score: i16,
 }
 
 impl Processor<CreateConversationMessageMetric> for DatabaseProcessor {
-    type Output = ();
+    type Output = i64;
     type Error = sqlx::Error;
 
     #[instrument(skip_all, name = "SQL:CreateConversationMessageMetric", err,
         fields(message_id = input.message_id))]
-    async fn process(&self, input: CreateConversationMessageMetric) -> Result<(), sqlx::Error> {
-        sqlx::query!(
+    async fn process(&self, input: CreateConversationMessageMetric) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar!(
             r#"
             INSERT INTO memory.conversation_message_metric
                 (message_id, semantic_distance, cumulative_distance)
-            VALUES ($1, $2, $3)
+            SELECT
+                $1,
+                $2::smallint,
+                COALESCE(
+                    (
+                        SELECT MAX(m.cumulative_distance)
+                        FROM memory.conversation_message_metric m
+                        JOIN memory.conversation_message cm ON cm.id = m.message_id
+                        WHERE cm.conversation_id = (
+                            SELECT conversation_id
+                            FROM memory.conversation_message
+                            WHERE id = $1
+                        )
+                    ),
+                    0
+                ) + $2::bigint
+            RETURNING cumulative_distance
             "#,
             input.message_id,
-            input.semantic_distance,
-            input.cumulative_distance,
+            input.score,
         )
-        .execute(self.db())
-        .await?;
-        Ok(())
+        .fetch_one(self.db())
+        .await
     }
 }
 
