@@ -17,6 +17,8 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 ai_caller = { path = "../ai_caller" }
+memory_repository = { path = "../memory_repository" }
+uuid.workspace = true
 
 [build-dependencies]
 tonic-prost-build.workspace = true
